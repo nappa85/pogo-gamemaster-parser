@@ -207,10 +207,8 @@ static LEGACY_CHARGED_MOVES: Lazy<HashMap<String, Vec<&'static str>>> = Lazy::ne
 // intermediate struct
 #[derive(Debug)]
 struct Moveset<'a> {
-    pokemon_id: &'a str,
-    form: Option<&'a str>,
+    pokemon: &'a entities::PokemonSettings,
     max_level: (u64, u16, u16, u16, u16),
-    stats: &'a entities::Stats,
     fast_move: &'a entities::CombatMove,
     charged_move: &'a entities::CombatMove,
 }
@@ -224,10 +222,8 @@ impl<'a> Moveset<'a>{
                     for charged_move in &charged {
                         // for max_level in &max {
                             res.push(Moveset {
-                                pokemon_id: p.pokemon_id.as_str(),
-                                form: p.form.as_ref().map(|s| s.as_str()),
+                                pokemon: p,
                                 max_level: max,//*max_level,
-                                stats: &p.stats,
                                 fast_move,
                                 charged_move,
                             });
@@ -313,7 +309,15 @@ impl<'a> Moveset<'a>{
     }
 
     fn get_attack(&self, player_level: &entities::PlayerLevel) -> f64 {
-        (((self.stats.base_attack + self.max_level.2) as f64) * player_level.cp_multiplier[(self.max_level.1 - 1) as usize]).floor() + 1.0
+        (((self.pokemon.stats.base_attack + self.max_level.2) as f64) * player_level.cp_multiplier[(self.max_level.1 - 1) as usize]).floor() + 1.0
+    }
+
+    // gets the median damage value per turn
+    pub fn get_median(&self, player_level: &entities::PlayerLevel) -> Option<f64> {
+        match (self.get_dpc(player_level), self.get_tpc()) {
+            (Some(damage), Some(time)) => Some(damage / (time as f64)),
+            _ => None
+        }
     }
 }
 
@@ -348,17 +352,17 @@ async fn main() -> Result<(), ()> {
         .flatten()
         .collect();
     // Sort by charge move quickness and then by damage
-    movesets.par_sort_unstable_by(|a, b| {
-        a.get_tpc()
-            .partial_cmp(&b.get_tpc())
-            .unwrap()
-            .reverse()
-            .then_with(|| {
-                a.get_dpc(player_level)
-                    .partial_cmp(&b.get_dpc(player_level))
-                    .unwrap()
-            })
-    });
+    // movesets.par_sort_unstable_by(|a, b| {
+    //     a.get_tpc()
+    //         .partial_cmp(&b.get_tpc())
+    //         .unwrap()
+    //         .reverse()
+    //         .then_with(|| {
+    //             a.get_dpc(player_level)
+    //                 .partial_cmp(&b.get_dpc(player_level))
+    //                 .unwrap()
+    //         })
+    // });
     // // Sort by damage and then by charge move quickness
     // movesets.par_sort_unstable_by(|a, b| {
     //     a.get_dpc(player_level)
@@ -371,7 +375,20 @@ async fn main() -> Result<(), ()> {
     //                 .reverse()
     //         })
     // });
+    // Sort by (damage / charge move quickness) and then by quickness
+    movesets.par_sort_unstable_by(|a, b| {
+        a.get_median(player_level)
+            .partial_cmp(&b.get_median(player_level))
+            .unwrap()
+            .then_with(|| {
+                a.get_tpc()
+                    .partial_cmp(&b.get_tpc())
+                    .unwrap()
+            })
+    });
 
-    println!("{:#?}", movesets.iter().map(|ms| format!("{} ({:?}) {} {} lvl {} {} {} {} {} ({:?} TPC - {:?} DPC)", ms.pokemon_id, ms.form, ms.max_level.0, ms.max_level.1, ms.max_level.2, ms.max_level.3, ms.max_level.4, ms.fast_move.unique_id, ms.charged_move.unique_id, ms.get_tpc(), ms.get_dpc(player_level))).collect::<Vec<String>>());
+    for ms in movesets {
+        println!("{} ({:?}) {} {} lvl {} {} {} {} {} ({:?} DPC / {:?} TPC = {:?})", ms.pokemon.pokemon_id, ms.pokemon.form, ms.max_level.0, ms.max_level.1, ms.max_level.2, ms.max_level.3, ms.max_level.4, ms.fast_move.unique_id, ms.charged_move.unique_id, ms.get_dpc(player_level), ms.get_tpc(), ms.get_median(player_level));
+    }
     Ok(())
 }
