@@ -23,6 +23,10 @@ pub struct Template {
     pub background_mode_settings: Option<BackgroundModeSettings>,
     #[serde(rename = "badgeSettings")]
     pub badge_settings: Option<BadgeSettings>,
+    #[serde(rename = "battleHubBadgeSettings")]
+    pub battle_hub_badge_settings : Option<BattleHubBadgeSettings>,
+    #[serde(rename = "battleHubOrderSettings")]
+    pub battle_hub_order_settings: Option<BattleHubOrderSettings>,
     #[serde(rename = "battleSettings")]
     pub battle_settings: Option<BattleSettings>,
     #[serde(rename = "belugaPokemonWhitelist")]
@@ -47,12 +51,16 @@ pub struct Template {
     pub buddy_walk_settings: Option<BuddyWalkSettings>,
     #[serde(rename = "invasionNpcDisplaySettings")]
     pub invasion_npc_display_settings: Option<InvasionNpcDisplaySettings>,
+    #[serde(rename = "combatCompetitiveSeasonSettings")]
+    pub combat_competitive_season_settings: Option<CombatCompetitiveSeasonSettings>,
     #[serde(rename = "combatLeague")]
     pub combat_league: Option<CombatLeague>,
     #[serde(rename = "combatLeagueSettings")]
     pub combat_league_settings: Option<CombatLeagueSettings>,
     #[serde(rename = "combatType")]
     pub combat_type: Option<CombatType>,
+    #[serde(rename = "combatRankingProtoSettings")]
+    pub combat_ranking_proto_settings: Option<CombatRankingProtoSettings>,
     #[serde(rename = "combatSettings")]
     pub combat_settings: Option<CombatSettings>,
     #[serde(rename = "combatStatStageSettings")]
@@ -113,6 +121,12 @@ pub struct Template {
     pub combat_npc_personality: Option<CombatNpcPersonality>,
     #[serde(rename = "pokemonSettings")]
     pub pokemon_settings: Option<PokemonSettings>,
+    #[serde(rename = "vsSeekerClientSettings")]
+    pub vs_seeker_client_settings: Option<VsSeekerClientSettings>,
+    #[serde(rename = "vsSeekerLootProto")]
+    pub vs_seeker_loot_proto: Option<VsSeekerLootProto>,
+    #[serde(rename = "vsSeekerPokemonRewards")]
+    pub vs_seeker_pokemon_rewards: Option<VsSeekerPokemonRewards>,
     #[serde(rename = "moveSettings")]
     pub move_settings: Option<MoveSettings>,
     #[serde(rename = "weatherAffinities")]
@@ -181,6 +195,35 @@ pub struct BadgeSettings {
     pub targets: Vec<u32>,
     #[serde(rename = "eventBadge")]
     pub event_badge: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BattleHubBadgeSettings {
+    #[serde(rename = "combatHubDisplayedBadges")]
+    pub combat_hub_displayed_badges: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BattleHubOrderSettings {
+    section: Vec<Section>,
+    #[serde(rename = "sectionGroup")]
+    section_group: Vec<SectionGroup>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Section {
+    #[serde(rename = "mainSection")]
+    main_section: String,
+    subsection: Vec<String>
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SectionGroup {
+    section: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -346,6 +389,17 @@ pub struct InvasionNpcDisplaySettings {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct CombatCompetitiveSeasonSettings {
+    #[serde(rename = "seasonEndTimeTimestamp")]
+    pub season_end_time_timestamp: Vec<String>,
+    #[serde(rename = "ratingAdjustmentPercentage")]
+    pub rating_adjustment_percentage: f32,
+    #[serde(rename = "rankingAdjustmentPercentage")]
+    pub ranking_adjustment_percentage: f32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Avatar {
     pub avatar: u8,
 }
@@ -367,6 +421,8 @@ pub struct CombatLeague {
     pub banned_pokemon: Vec<String>,
     #[serde(rename = "badgeType")]
     pub badge_type: String,
+    #[serde(rename = "battlePartyCombatLeagueTemplateId")]
+    pub battle_party_combat_league_template_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -376,7 +432,7 @@ pub struct PokemonCondition {
     #[serde(rename = "minPokemonCount")]
     pub min_pokemon_count: Option<u8>,
     #[serde(rename = "withPokemonCpLimit")]
-    pub with_pokemon_cp_limit: Limit,
+    pub with_pokemon_cp_limit: Option<Limit>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -405,6 +461,30 @@ pub struct CombatType {
     pub great_level_threshold: f32,
     #[serde(rename = "excellentLevelThreshold")]
     pub excellent_level_threshold: f32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CombatRankingProtoSettings {
+    #[serde(rename = "rankLevel")]
+    pub rank_level: Vec<RankLevel>,
+    #[serde(rename = "requiredForRewards")]
+    pub required_for_rewards: RankLevel,
+    #[serde(rename = "minRankToDisplayRating")]
+    pub min_rank_to_display_rating: u8,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RankLevel {
+    #[serde(rename = "rankLevel")]
+    pub rank_level: u8,
+    #[serde(rename = "additionalTotalBattlesRequired")]
+    pub additional_total_battles_required: Option<u8>,
+    #[serde(rename = "additionalWinsRequired")]
+    pub additional_wins_required: Option<u8>,
+    #[serde(rename = "minRatingRequired")]
+    pub min_rating_required: Option<u16>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -943,8 +1023,10 @@ pub struct CombatNpcTrainer {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AvailablePokemon {
+    #[serde(rename = "pokemonId")]
+    pub pokemon_id: Option<String>,
     #[serde(rename = "pokemonType")]
-    pub pokemon_type: String,
+    pub pokemon_type: Option<String>,
     #[serde(rename = "pokemonDisplay")]
     pub pokemon_display: Option<PokemonForm>,
 }
@@ -1158,6 +1240,88 @@ pub struct Shadow {
     pub purified_charge_move: String,
     #[serde(rename = "shadowChargeMove")]
     pub shadow_charge_move: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VsSeekerClientSettings {
+    #[serde(rename = "allowedVsSeekerLeagueTemplateId")]
+    pub allowed_vs_seeker_league_template_id: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VsSeekerLootProto {
+    #[serde(rename = "rankLevel")]
+    pub rank_level: u8,
+    pub reward: Vec<Reward>,
+    #[serde(rename = "rewardTrack")]
+    pub reward_track: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Reward {
+    pub item: Option<Item>,
+    #[serde(rename = "itemLootTable")]
+    pub item_loot_table: Option<bool>,
+    #[serde(rename = "pokemonReward")]
+    pub pokemon_reward: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Item {
+    pub count: u16,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VsSeekerPokemonRewards {
+    #[serde(rename = "availablePokemon")]
+    pub available_pokemon: Vec<PokemonReward>,
+    #[serde(rename = "rewardTrack")]
+    pub reward_track: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PokemonReward {
+    pub pokemon: Option<AvailablePokemon>,
+    #[serde(rename = "guaranteedLimitedPokemonReward")]
+    pub guaranteed_limited_pokemon_reward: Option<GuaranteedLimitedPokemonReward>,
+    #[serde(rename = "unlockedAtRank")]
+    pub unlocked_at_rank: u8,
+    #[serde(rename = "attackIvOverride")]
+    pub attack_iv_override: IvOverride,
+    #[serde(rename = "defenseIvOverride")]
+    pub defense_iv_override: IvOverride,
+    #[serde(rename = "staminaIvOverride")]
+    pub stamina_iv_override: IvOverride,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GuaranteedLimitedPokemonReward {
+    pub pokemon: AvailablePokemon,
+    pub identifier: String,
+    #[serde(rename = "lifetimeMaxCount")]
+    pub lifetime_max_count: u8,
+    #[serde(rename = "rewardTrack")]
+    pub reward_track: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IvOverride {
+    pub range: Range,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Range {
+    pub min: String,
+    pub max: String,
 }
 
 #[derive(Debug, Deserialize)]
