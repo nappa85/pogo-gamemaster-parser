@@ -15,9 +15,9 @@ use futures_util::stream::{iter, StreamExt};
 
 use once_cell::sync::Lazy;
 
-use serde_json::json;
+use serde_json::{json, value::Value};
 
-use log::error;
+use log::{error, info};
 
 mod entities;
 
@@ -358,45 +358,54 @@ async fn main() -> Result<(), ()> {
     let movesets = root.item_templates.iter()
         .filter(|item| item.pokemon_settings.is_some())
         .map(|item| Moveset::from(item.pokemon_settings.as_ref().unwrap(), &combat_moves, &player_level))
-        .flatten();
+        .filter(|mvs| !mvs.is_empty());
 
-    log::info!("here we go!");
+    info!("Here we go!");
 
     // very aggressive
-    iter(movesets).for_each_concurrent(None, |mv| async move {
+    iter(movesets).for_each_concurrent(Some(10), |mut mvs| async move {
         let client = Client::new();// not good
-        loop {
-            if let Ok(res) = client.post(TARGET.as_str())
-                .json(&json!({
-                    "pokemon_id": mv.pokemon.pokemon_id.as_str(),
-                    "pokemon_type1": mv.pokemon.r#type.as_str(),
-                    "pokemon_type2": mv.pokemon.type2.as_ref().map(|s| s.as_str()),
-                    "base_atk": mv.pokemon.stats.base_attack,
-                    "base_def": mv.pokemon.stats.base_defense,
-                    "base_sta": mv.pokemon.stats.base_stamina,
-                    "form": mv.pokemon.form.as_ref().map(|s| s.as_str()),
-                    "pl": mv.pl,
-                    "level": mv.level,
-                    "atk": mv.atk,
-                    "def": mv.def,
-                    "sta": mv.sta,
-                    "fast_move": mv.fast_move.unique_id.as_str(),
-                    "fast_type": mv.fast_move.r#type.as_str(),
-                    "fast_legacy": mv.fast_legacy,
-                    "charged_move": mv.charged_move.unique_id.as_str(),
-                    "charged_type": mv.charged_move.r#type.as_str(),
-                    "charged_legacy": mv.charged_legacy,
-                    "tpc": mv.tpc,
-                    "dpc": mv.dpc,
-                }))
-                .send()
-                .await
-                .map_err(|e| error!("Transmission error: {}", e)) {
-                if res.status().is_success() {
-                    break;
-                }
-                else {
-                    error!("Creation error: {:?}", res.text().await);
+        'outer: loop {
+            if mvs.is_empty() {
+                break;
+            }
+
+            let movesets = mvs.drain(0..1000.min(mvs.len())).map(|mv| json!({
+                "pokemon_id": mv.pokemon.pokemon_id.as_str(),
+                "pokemon_type1": mv.pokemon.r#type.as_str(),
+                "pokemon_type2": mv.pokemon.type2.as_ref().map(|s| s.as_str()),
+                "base_atk": mv.pokemon.stats.base_attack,
+                "base_def": mv.pokemon.stats.base_defense,
+                "base_sta": mv.pokemon.stats.base_stamina,
+                "form": mv.pokemon.form.as_ref().map(|s| s.as_str()),
+                "pl": mv.pl,
+                "level": mv.level,
+                "atk": mv.atk,
+                "def": mv.def,
+                "sta": mv.sta,
+                "fast_move": mv.fast_move.unique_id.as_str(),
+                "fast_type": mv.fast_move.r#type.as_str(),
+                "fast_legacy": mv.fast_legacy,
+                "charged_move": mv.charged_move.unique_id.as_str(),
+                "charged_type": mv.charged_move.r#type.as_str(),
+                "charged_legacy": mv.charged_legacy,
+                "tpc": mv.tpc,
+                "dpc": mv.dpc,
+            })).collect::<Vec<Value>>();
+
+            loop {
+                if let Ok(res) = client.post(TARGET.as_str())
+                    .json(&movesets)
+                    .send()
+                    .await
+                    .map_err(|e| error!("Transmission error: {}", e)) {
+                    if res.status().is_success() {
+                        info!("Inserted {} combinations", movesets.len());
+                        continue 'outer;
+                    }
+                    else {
+                        error!("Creation error: {:?}", res.text().await);
+                    }
                 }
             }
         }
