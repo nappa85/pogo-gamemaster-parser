@@ -21,7 +21,7 @@ use log::{error, info};
 
 mod entities;
 
-const CP_CAP: RangeInclusive<u64> = 1400..=1500;
+const CP_CAP: RangeInclusive<u32> = 1400..=1500;
 
 static TARGET: Lazy<String> = Lazy::new(|| env::var("TARGET").expect("Missing TARGET env var"));
 
@@ -215,11 +215,12 @@ static LEGACY_CHARGED_MOVES: Lazy<HashMap<String, Vec<&'static str>>> = Lazy::ne
 #[derive(Debug)]
 struct Moveset<'a> {
     pokemon: &'a entities::PokemonSettings,
-    pl: u64,
+    cp: u32,
     level: u8,
-    atk: u8,
-    def: u8,
-    sta: u8,
+    // atk: u8,
+    // def: u8,
+    // sta: u8,
+    cpm: f64,
     fast_move: &'a entities::CombatMove,
     fast_legacy: Option<bool>,
     charged_move: &'a entities::CombatMove,
@@ -232,25 +233,26 @@ impl<'a> Moveset<'a>{
     fn from(p: &'a entities::PokemonSettings, combat_moves: &'a HashMap<&'a str, &'a entities::CombatMove>, player_level: &entities::PlayerLevel) -> Vec<Self> {
         let mut res = Vec::new();
         match (Self::convert_moves(&p.quick_moves, LEGACY_QUICK_MOVES.get(&p.pokemon_id), combat_moves), Self::convert_moves(&p.cinematic_moves, LEGACY_CHARGED_MOVES.get(&p.pokemon_id), combat_moves), Self::get_max_level(&p.stats, player_level)) {
-            (Some(fast), Some(charged), Some(max)) => {
+            (Some(fast), Some(charged), Some((cp, level))) => {
                 for fast_move in &fast {
                     for charged_move in &charged {
-                        for (pl, level, atk, def, sta) in &max {
+                        // for (cp, level, atk, def, sta) in &max {
                             res.push(Moveset {
                                 pokemon: p,
-                                pl: *pl,
-                                level: *level,
-                                atk: *atk,
-                                def: *def,
-                                sta: *sta,
+                                cp,
+                                level,
+                                // atk: *atk,
+                                // def: *def,
+                                // sta: *sta,
+                                cpm: player_level.cp_multiplier[(level - 1) as usize],
                                 fast_move,
                                 fast_legacy: p.quick_moves.as_ref().map(|moves| !moves.contains(&fast_move.unique_id)),
                                 charged_move,
                                 charged_legacy: p.cinematic_moves.as_ref().map(|moves| !moves.contains(&charged_move.unique_id)),
                                 tpc: Self::get_tpc(fast_move, charged_move),
-                                dpc: Self::get_dpc(fast_move, charged_move, p, *level, *atk, player_level),
+                                dpc: Self::get_dpc(p, fast_move, charged_move/*, p, *level, *atk, player_level*/),
                             });
-                        }
+                        // }
                     }
                 }
             },
@@ -280,33 +282,35 @@ impl<'a> Moveset<'a>{
     }
 
     // return maximum pokemon level for every IV combination to fit CP_CAP
-    fn get_max_level(stats: &entities::Stats, player_level: &entities::PlayerLevel) -> Option<Vec<(u64, u8, u8, u8, u8)>> {
-        let mut res = Vec::new();
+    fn get_max_level(stats: &entities::Stats, player_level: &entities::PlayerLevel) -> Option<(u32, u8)> {
+        // let mut res = Vec::new();
         for level in (1_u8..=41_u8).rev() {
-            for sta in (0_u8..=15_u8).rev() {
-                for def in (0_u8..=15_u8).rev() {
-                    for atk in (0_u8..=15_u8).rev() {
-                        let cp = Self::get_cp(stats, level, atk, def, sta, player_level);
+            // for sta in (0_u8..=15_u8).rev() {
+                // for def in (0_u8..=15_u8).rev() {
+                    // for atk in (0_u8..=15_u8).rev() {
+                        let cp = Self::get_cp(stats, level, 15, 15, 15, player_level);
                         if CP_CAP.contains(&cp) {
-                            // store only max level for every IV combination
-                            if res.iter().find(|(_, _, s_atk, s_def, s_sta)| s_atk == &atk && s_def == &def && s_sta == &sta).is_none() {
-                                res.push((cp, level, atk, def, sta));
-                            }
+                            // // store only max level for every IV combination
+                            // if res.iter().find(|(_, _, s_atk, s_def, s_sta)| s_atk == &atk && s_def == &def && s_sta == &sta).is_none() {
+                            //     res.push((cp, level, atk, def, sta));
+                            // }
+                            return Some((cp, level));
                         }
-                    }
-                }
-            }
+                    // }
+                // }
+            // }
         }
-        if res.is_empty() {
-            None
-        }
-        else {
-            Some(res)
-        }
+        // if res.is_empty() {
+        //     None
+        // }
+        // else {
+        //     Some(res)
+        // }
+        None
     }
 
-    fn get_cp(stats: &entities::Stats, level: u8, atk: u8, def: u8, sta: u8, player_level: &entities::PlayerLevel) -> u64 {
-        ((((stats.base_attack + (atk as u16)) as f64) * ((stats.base_defense + (def as u16)) as f64).powf(0.5) * ((stats.base_stamina + (sta as u16)) as f64).powf(0.5) * player_level.cp_multiplier[(level - 1) as usize].powi(2)) / 10_f64).floor() as u64
+    fn get_cp(stats: &entities::Stats, level: u8, atk: u8, def: u8, sta: u8, player_level: &entities::PlayerLevel) -> u32 {
+        ((((stats.base_attack + (atk as u16)) as f64) * ((stats.base_defense + (def as u16)) as f64).powf(0.5) * ((stats.base_stamina + (sta as u16)) as f64).powf(0.5) * player_level.cp_multiplier[(level - 1) as usize].powi(2)) / 10_f64).floor() as u32
     }
 
     // how many turns of fast move are needed to launch a charged move
@@ -318,16 +322,16 @@ impl<'a> Moveset<'a>{
     }
 
     // get the total amount of damage given by the fast moves neede to lauch  a charged move, and the charged move itself, all moltiplied by base attack stat
-    fn get_dpc(fast_move: &entities::CombatMove, charged_move: &entities::CombatMove, pokemon: &entities::PokemonSettings, level: u8, atk: u8, player_level: &entities::PlayerLevel) -> Option<f64> {
+    fn get_dpc(pokemon: &entities::PokemonSettings, fast_move: &entities::CombatMove, charged_move: &entities::CombatMove/*, pokemon: &entities::PokemonSettings, level: u8, atk: u8, player_level: &entities::PlayerLevel*/) -> Option<f64> {
         match (charged_move.energy_delta, fast_move.energy_delta) {
-            (Some(c), Some(f)) => Some(((((c * -1) as f64)  / (f as f64)).ceil() * (fast_move.power.unwrap_or_else(|| 0.0) as f64) + (charged_move.power.unwrap_or_else(|| 0.0) as f64)) * Self::get_attack(pokemon, level, atk, player_level)),
+            (Some(c), Some(f)) => Some((((c * -1) as f64)  / (f as f64)).ceil() * (fast_move.power.unwrap_or_else(|| 0.0) as f64) * (if pokemon.r#type == fast_move.r#type || pokemon.type2.as_ref() == Some(&fast_move.r#type) { 1.2 } else { 1.0 }) + (charged_move.power.unwrap_or_else(|| 0.0) as f64) * (if pokemon.r#type == charged_move.r#type || pokemon.type2.as_ref() == Some(&charged_move.r#type) { 1.2 } else { 1.0 })),// * Self::get_attack(pokemon, level, atk, player_level)),
             _ => None,
         }
     }
 
-    fn get_attack(pokemon: &entities::PokemonSettings, level: u8, atk: u8, player_level: &entities::PlayerLevel) -> f64 {
-        (((pokemon.stats.base_attack + (atk as u16)) as f64) * player_level.cp_multiplier[(level - 1) as usize]).floor() + 1.0
-    }
+    // fn get_attack(pokemon: &entities::PokemonSettings, level: u8, atk: u8, player_level: &entities::PlayerLevel) -> f64 {
+    //     (((pokemon.stats.base_attack + (atk as u16)) as f64) * player_level.cp_multiplier[(level - 1) as usize]).floor() + 1.0
+    // }
 }
 
 #[tokio::main]
@@ -341,11 +345,13 @@ async fn main() -> Result<(), ()> {
         .json()
         .await
         .map_err(|e| error!("Game Master decode error: {}", e))?;
+
     // load CPM
     let player_level = root.item_templates.iter()
         .find(|item| item.player_level.is_some())
         .map(|item| item.player_level.as_ref().unwrap())
         .unwrap();
+
     // create PVP moves dictionary
     let combat_moves: HashMap<&str, &entities::CombatMove> = root.item_templates.iter()
         .filter(|item| item.combat_move.is_some())
@@ -354,13 +360,27 @@ async fn main() -> Result<(), ()> {
             (combat_move.unique_id.as_str(), combat_move)
         })
         .collect();
-    // create Pokémon-Moveset dicionary
-    let movesets = root.item_templates.iter()
+
+    // create Pokémon-Form dicionary
+    let mut pokemon: Vec<&entities::PokemonSettings> = root.item_templates.iter()
         .filter(|item| item.pokemon_settings.is_some())
-        .map(|item| Moveset::from(item.pokemon_settings.as_ref().unwrap(), &combat_moves, &player_level))
-        .filter(|mvs| !mvs.is_empty());
+        .map(|item| item.pokemon_settings.as_ref().unwrap())
+        .collect();
+    // try to cleanup duplication given by forms
+    pokemon.sort_unstable_by(|a, b| a.pokemon_id.cmp(&b.pokemon_id).then_with(|| a.stats.cmp(&b.stats)));
+    pokemon.dedup_by(|a, b| a.pokemon_id == b.pokemon_id && a.r#type == b.r#type && a.type2 == b.type2 && a.stats == b.stats);
+    // pokemon.iter().for_each(|p| println!("{} {:?} {} {:?} {:?}", p.pokemon_id, p.form, p.r#type, p.type2, p.stats));
+
+    // create Pokémon-Moveset dicionary
+    let movesets = pokemon.iter()
+        .map(|p| Moveset::from(p, &combat_moves, &player_level));
+        // .flatten()
+        // .collect();
 
     info!("Here we go!");
+
+    // movesets.sort_unstable_by(|a, b| a.tpc.cmp(&b.tpc).reverse().then_with(|| (a.dpc.unwrap_or_else(|| 0.0) * (a.pokemon.stats.base_attack as f64)).partial_cmp(&(b.dpc.unwrap_or_else(|| 0.0) * (b.pokemon.stats.base_attack as f64))).unwrap()));
+    // movesets.iter().for_each(|mv| println!("{} {:?} {}{} {}{} {:?} {:?}", mv.pokemon.pokemon_id, mv.pokemon.form, mv.fast_move.unique_id, if mv.fast_legacy == Some(true) { "!" } else { "" }, mv.charged_move.unique_id, if mv.charged_legacy == Some(true) { "!" } else { "" }, mv.tpc, mv.dpc.as_ref().map(|dpc| dpc * &(mv.pokemon.stats.base_attack as f64))));
 
     // very aggressive
     iter(movesets).for_each_concurrent(Some(10), |mut mvs| async move {
@@ -378,11 +398,12 @@ async fn main() -> Result<(), ()> {
                 "base_def": mv.pokemon.stats.base_defense,
                 "base_sta": mv.pokemon.stats.base_stamina,
                 "form": mv.pokemon.form.as_ref().map(|s| s.as_str()),
-                "pl": mv.pl,
+                "cp": mv.cp,
                 "level": mv.level,
-                "atk": mv.atk,
-                "def": mv.def,
-                "sta": mv.sta,
+                // "atk": mv.atk,
+                // "def": mv.def,
+                // "sta": mv.sta,
+                "cpm": mv.cpm,
                 "fast_move": mv.fast_move.unique_id.as_str(),
                 "fast_type": mv.fast_move.r#type.as_str(),
                 "fast_legacy": mv.fast_legacy,
@@ -400,7 +421,7 @@ async fn main() -> Result<(), ()> {
                     .await
                     .map_err(|e| error!("Transmission error: {}", e)) {
                     if res.status().is_success() {
-                        info!("Inserted {} combinations", movesets.len());
+                        info!("Inserted {} combinations: {:?}", movesets.len(), res.text().await);
                         continue 'outer;
                     }
                     else {
@@ -410,5 +431,6 @@ async fn main() -> Result<(), ()> {
             }
         }
     }).await;
+
     Ok(())
 }

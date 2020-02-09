@@ -1183,7 +1183,7 @@ pub struct Encounter {
     pub max_pokemon_action_frequency_s: f32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(deny_unknown_fields)]
 pub struct Stats {
     #[serde(rename = "baseStamina")]
