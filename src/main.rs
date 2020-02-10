@@ -329,7 +329,7 @@ impl<'a> Moveset<'a>{
         }
     }
 
-    // get the total amount of damage given by the fast moves neede to lauch  a charged move, and the charged move itself, all moltiplied by base attack stat
+    // get the total amount of damage given by the fast moves neede to lauch  a charged move, and the charged move itself
     fn get_dpc(pokemon: &entities::PokemonSettings, fast_move: &entities::CombatMove, charged_move: &entities::CombatMove, level: u8, atk: u8, player_level: &entities::PlayerLevel) -> Option<f64> {
         match (charged_move.energy_delta, fast_move.energy_delta) {
             (Some(c), Some(f)) => Some((((c * -1) as f64)  / (f as f64)).ceil() * (fast_move.power.unwrap_or_else(|| 0.0) as f64) * (if pokemon.r#type == fast_move.r#type || pokemon.type2.as_ref() == Some(&fast_move.r#type) { 1.2 } else { 1.0 }) + (charged_move.power.unwrap_or_else(|| 0.0) as f64) * (if pokemon.r#type == charged_move.r#type || pokemon.type2.as_ref() == Some(&charged_move.r#type) { 1.2 } else { 1.0 }) * Self::get_attack(pokemon, level, atk, player_level)),
@@ -369,26 +369,36 @@ async fn main() -> Result<(), ()> {
         })
         .collect();
 
-    // create Pokémon-Form dicionary
-    let mut pokemon: Vec<&entities::PokemonSettings> = root.item_templates.iter()
+    // create Pokémon-Form dictionary
+    let pokemon: HashMap<&str, HashMap<Option<&str>, &entities::PokemonSettings>> = root.item_templates.iter()
         .filter(|item| item.pokemon_settings.is_some())
-        .map(|item| item.pokemon_settings.as_ref().unwrap())
-        .collect();
-    // try to cleanup duplication given by forms
-    pokemon.sort_unstable_by(|a, b| a.pokemon_id.cmp(&b.pokemon_id).then_with(|| a.stats.cmp(&b.stats)));
-    pokemon.dedup_by(|a, b| a.pokemon_id == b.pokemon_id && a.r#type == b.r#type && a.type2 == b.type2 && a.stats == b.stats);
-    // pokemon.iter().for_each(|p| println!("{} {:?} {} {:?} {:?}", p.pokemon_id, p.form, p.r#type, p.type2, p.stats));
+        .fold(HashMap::new(), |mut dict, item| {
+            let pokemon = item.pokemon_settings.as_ref().unwrap();
+            let sub_dict = dict.entry(pokemon.pokemon_id.as_str()).or_insert_with(HashMap::new);
+            sub_dict.insert(pokemon.form.as_ref().map(|s| s.as_str()), pokemon);
+            dict
+        });
+    
+    // create Pokémon-Moveset dictionary
+    let movesets = pokemon.into_iter()
+        // try to cleanup duplication given by forms
+        .map(|(_, forms)| {
+            let base_form = forms.get(&None);
+            let base_stats = base_form.map(|p| p.stats);
+            let base_type = base_form.map(|p| (p.r#type.clone(), p.type2.clone()));
 
-    // create Pokémon-Moveset dicionary
-    let movesets = pokemon.iter()
+            forms.into_iter()
+                .filter(move |(_, p)| {
+                    p.form.is_none() ||
+                    Some((&p.r#type, p.type2.as_ref())) != base_type.as_ref().map(|(t1, t2)| (t1, t2.as_ref())) ||
+                    Some(&p.stats) != base_stats.as_ref()
+                })
+                .map(|(_, p)| p)
+        })
+        .flatten()
         .map(|p| Moveset::from(p, &combat_moves, &player_level));
-        // .flatten()
-        // .collect();
 
     info!("Here we go!");
-
-    // movesets.sort_unstable_by(|a, b| a.tpc.cmp(&b.tpc).reverse().then_with(|| (a.dpc.unwrap_or_else(|| 0.0) * (a.pokemon.stats.base_attack as f64)).partial_cmp(&(b.dpc.unwrap_or_else(|| 0.0) * (b.pokemon.stats.base_attack as f64))).unwrap()));
-    // movesets.iter().for_each(|mv| println!("{} {:?} {}{} {}{} {:?} {:?}", mv.pokemon.pokemon_id, mv.pokemon.form, mv.fast_move.unique_id, if mv.fast_legacy == Some(true) { "!" } else { "" }, mv.charged_move.unique_id, if mv.charged_legacy == Some(true) { "!" } else { "" }, mv.tpc, mv.dpc.as_ref().map(|dpc| dpc * &(mv.pokemon.stats.base_attack as f64))));
 
     // very aggressive
     iter(movesets).for_each_concurrent(Some(10), |mut mvs| async move {
