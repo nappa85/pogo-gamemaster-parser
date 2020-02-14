@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport" />
+    <title>Pokémon Movesets</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/extjs/6.2.0/modern/theme-material/resources/theme-material-all.css" />
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/extjs/6.2.0/ext-modern-all-debug.js"></script>
+    <script type="text/javascript">
+        var LEGACY_QUICK_MOVES = {
+            "GRIMER": ["ACID_FAST"],
+            "KOFFING": ["ACID_FAST"],
+            "WEEZING": ["ACID_FAST"],
+            "MUK": ["ACID_FAST", "LICK_FAST"],
+            "ARCANINE": ["BITE_FAST"],
+            "SHEDINJA": ["BITE_FAST", "STRUGGLE_BUG_FAST"],
+            "BUTTERFREE": ["BUG_BITE_FAST"],
+            "BEEDRILL": ["BUG_BITE_FAST"],
+            "PARASECT": ["BUG_BITE_FAST"],
+            "VENOMOTH": ["BUG_BITE_FAST"],
+            "FARFETCHD": ["CUT_FAST"],
+            "GYARADOS": ["DRAGON_TAIL_FAST"],
+            "NINETALES": ["EMBER_FAST"],
+            "RAPIDASH": ["EMBER_FAST"],
+            "MOLTRES": ["EMBER_FAST"],
+            "CHARIZARD": ["EMBER_FAST", "WING_ATTACK_FAST"],
+            "SMOOCHUM": ["FROST_BREATH_FAST"],
+            "NIDOKING": ["FURY_CUTTER_FAST"],
+            "KABUTOPS": ["FURY_CUTTER_FAST"],
+            "SUICUNE": ["HIDDEN_POWER_FAST"],
+            "DEWGONG": ["ICE_SHARD_FAST"],
+            "LAPRAS": ["ICE_SHARD_FAST"],
+            "DELIBIRD": ["ICE_SHARD_FAST", "QUICK_ATTACK_FAST"],
+            "PRIMEAPE": ["KARATE_CHOP_FAST"],
+            "MACHAMP": ["KARATE_CHOP_FAST"],
+            "HAUNTER": ["LICK_FAST"],
+            "GENGAR": ["LICK_FAST"],
+            "MACHOP": ["LOW_KICK_FAST"],
+            "DIGLETT": ["MUD_SHOT_FAST"],
+            "DUGTRIO": ["MUD_SHOT_FAST"],
+            "GRAVELER": ["MUD_SHOT_FAST"],
+            "GOLEM": ["MUD_SHOT_FAST"],
+            "KINGLER": ["MUD_SHOT_FAST"],
+            "SEAKING": ["POISON_JAB_FAST"],
+            "CLEFABLE": ["POUND_FAST"],
+            "JYNX": ["POUND_FAST"],
+            "PIKACHU": ["PRESENT_FAST"],
+            "STARYU": ["QUICK_ATTACK_FAST"],
+            "PICHU": ["QUICK_ATTACK_FAST"],
+            "STARMIE": ["QUICK_ATTACK_FAST", "TACKLE_FAST"],
+            "PORYGON": ["QUICK_ATTACK_FAST", "TACKLE_FAST", "ZEN_HEADBUTT_FAST"],
+            "WEEPINBELL": ["RAZOR_LEAF_FAST"],
+            "HITMONCHAN": ["ROCK_SMASH_FAST"],
+            "OMASTAR": ["ROCK_THROW_FAST"],
+            "CHARMELEON": ["SCRATCH_FAST"],
+            "TYRANITAR": ["SMACK_DOWN_FAST"],
+            "SCYTHER": ["STEEL_WING_FAST"],
+            "TOGETIC": ["STEEL_WING_FAST", "ZEN_HEADBUTT_FAST"],
+            "GASTLY": ["SUCKER_PUNCH_FAST"],
+            "ELECTRODE": ["TACKLE_FAST"],
+            "ZAPDOS": ["THUNDER_SHOCK_FAST"],
+            "SEEL": ["WATER_GUN_FAST"],
+            "FERALIGATR": ["WATER_GUN_FAST"],
+            "KINGDRA": ["WATER_GUN_FAST"],
+            "PIDGEOT": ["WING_ATTACK_FAST"],
+            "SNORLAX": ["YAWN_FAST"],
+            "EXEGGUTOR": ["ZEN_HEADBUTT_FAST"],
+            "TOGEPI": ["ZEN_HEADBUTT_FAST"],
+        };
+
+        var LEGACY_CHARGED_MOVES = {
+            "BULBASAUR": ["RETURN"],
+            "IVYSAUR": ["RETURN"],
+            "VENUSAUR": ["FRENZY_PLANT", "RETURN"],
+            "CHARMANDER": ["RETURN"],
+            "SQUIRTLE": ["RETURN"],
+            "WARTORTLE": ["RETURN"],
+            "BLASTOISE": ["HYDRO_CANNON", "RETURN"],
+            "RATTATA": ["RETURN"],
+            "RATICATE": ["RETURN"],
+            "SPEAROW": ["TWISTER"],
+            "FEAROW": ["TWISTER"],
+            "EKANS": ["GUNK_SHOT"],
+            "RAICHU": ["THUNDER"],
+            "SANDSHREW": ["ROCK_TOMB"],
+            "JIGGLYPUFF": ["PLAY_ROUGH", "BODY_SLAM"],
+            "ZUBAT": ["SLUDGE_BOMB", "RETURN"],
+            "GOLBAT": ["OMINOUS_WIND", "RETURN"],
+            "ODDISH": ["RETURN"],
+            "GLOOM": ["RETURN"],
+            "VILEPLUME": ["RETURN"],
+            "MEOWTH": ["BODY_SLAM"],
+            "PERSIAN": ["NIGHT_SLASH"],
+            "POLIWAG": ["RETURN"],
+            "POLIWAG": ["SCALD", "RETURN"],
+            "POLIWRATH": ["SUBMISSION", "RETURN"],
+            "ALAKAZAM": ["DAZZLING_GLEAM", "PSYCHIC"],
+            "MACHOKE": ["CROSS_CHOP"],
+            "PONYTA": ["FIRE_BLAST"],
+            "DODUO": ["SWIFT"],
+            "DODRIO": ["AIR_CUTTER"],
+            "CLOYSTER": ["BLIZZARD"],
+            "ONIX": ["IRON_HEAD", "ROCK_SLIDE"],
+            "DROWZEE": ["RETURN"],
+            "HYPNO": ["PSYSHOCK", "RETURN"],
+            "VOLTORB": ["SIGNAL_BEAM"],
+            "CUBONE": ["RETURN"],
+            "MAROWAK": ["RETURN"],
+            "HITMONLEE": ["STOMP", "BRICK_BREAK"],
+            "RHYDON": ["MEGAHORN"],
+            "CHANSEY": ["PSYBEAM"],
+            "TANGELA": ["POWER_WHIP"],
+            "KANGASKHAN": ["BRICK_BREAK", "STOMP"],
+            "SEADRA": ["BLIZZARD"],
+            "PINSIR": ["SUBMISSION"],
+            "MAGIKARP": ["RETURN"],
+            "EEVEE": ["BODY_SLAM", "LAST_RESORT"],
+            "VAPOREON": ["LAST_RESORT"],
+            "JOLTEON": ["LAST_RESORT"],
+            "JOLTEON": ["HEAT_WAVE", "LAST_RESORT"],
+            "OMANYTE": ["ROCK_TOMB", "BRINE"],
+            "ARTICUNO": ["HURRICANE", "RETURN"],
+            "DRATINI": ["RETURN"],
+            "DRAGONAIR": ["RETURN"],
+            "DRAGONAIR": ["DRAGON_PULSE", "DRACO_METEOR", "RETURN"],
+            "MEWTWO": ["SHADOW_BALL", "HYPER_BEAM", "PSYSTRIKE"],
+            "MEGANIUM": ["FRENZY_PLANT"],
+            "TYPHLOSION": ["BLAST_BURN"],
+            "CROBAT": ["RETURN"],
+            "CLEFFA": ["PSYCHIC", "BODY_SLAM"],
+            "IGGLYBUFF": ["BODY_SLAM"],
+            "AMPHAROS": ["DRAGON_PULSE"],
+            "BELLOSSOM": ["RETURN"],
+            "POLITOED": ["EARTHQUAKE", "RETURN"],
+            "ESPEON": ["LAST_RESORT"],
+            "UMBREON": ["LAST_RESORT"],
+            "HOUNDOUR": ["RETURN"],
+            "HOUNDOOM": ["RETURN"],
+            "ELEKID": ["THUNDERBOLT"],
+            "MAGBY": ["FLAMETHROWER"],
+            "SCEPTILE": ["FRENZY_PLANT"],
+            "BLAZIKEN": ["STONE_EDGE", "BLAST_BURN"],
+            "SWAMPERT": ["HYDRO_CANNON"],
+            "RALTS": ["RETURN"],
+            "KIRLIA": ["RETURN"],
+            "GARDEVOIR": ["SYNCHRONOISE", "RETURN"],
+            "BRELOOM": ["GRASS_KNOT"],
+            "SLAKING": ["BODY_SLAM"],
+            "LOUDRED": ["CRUNCH"],
+            "FLYGON": ["EARTH_POWER"],
+            "SALAMENCE": ["OUTRAGE"],
+            "METAGROSS": ["METEOR_MASH"],
+            "INFERNAPE": ["BLAST_BURN"],
+            "EMPOLEON": ["HYDRO_CANNON"],
+            "TORTERRA": ["RETURN", "FRENZY_PLANT"],
+            "LEAFEON": ["LAST_RESORT"],
+            "GLACEON": ["LAST_RESORT"],
+            "MAMOSWINE": ["ANCIENT_POWER"],
+            "GALLADE": ["SYNCHRONOISE", "RETURN"],
+            "GASTRODON": ["EARTHQUAKE"],
+            "GRIMER": ["RETURN"],
+            "MUK": ["RETURN"],
+            "ARCANINE": ["BULLDOZE", "RETURN"],
+            "GYARADOS": ["DRAGON_PULSE", "RETURN"],
+            "NINETALES": ["FIRE_BLAST", "FLAMETHROWER"],
+            "MOLTRES": ["SKY_ATTACK"],
+            "CHARIZARD": ["FLAMETHROWER", "BLAST_BURN", "RETURN"],
+            "DEWGONG": ["AQUA_JET", "ICY_WIND"],
+            "LAPRAS": ["DRAGON_PULSE", "ICE_BEAM"],
+            "PRIMEAPE": ["CROSS_CHOP"],
+            "MACHAMP": ["STONE_EDGE", "SUBMISSION"],
+            "GENGAR": ["SLUDGE_WAVE", "DARK_PULSE", "PSYCHIC"],
+            "GRAVELER": ["ROCK_SLIDE"],
+            "GOLEM": ["ANCIENT_POWER"],
+            "SEAKING": ["ICY_WIND", "DRILL_RUN"],
+            "JYNX": ["ICE_PUNCH"],
+            "PIKACHU": ["SURF", "THUNDER"],
+            "STARMIE": ["PSYBEAM"],
+            "PORYGON": ["DISCHARGE", "PSYBEAM", "SIGNAL_BEAM"],
+            "HITMONCHAN": ["BRICK_BREAK"],
+            "OMASTAR": ["ROCK_SLIDE"],
+            "CHARMELEON": ["RETURN"],
+            "SCYTHER": ["BUG_BUZZ", "RETURN"],
+            "GASTLY": ["OMINOUS_WIND"],
+            "ZAPDOS": ["DISCHARGE", "RETURN"],
+            "SEEL": ["AQUA_JET"],
+            "FERALIGATR": ["HYDRO_CANNON"],
+            "PIDGEOT": ["AIR_CUTTER"],
+            "SNORLAX": ["RETURN"],
+        };
+
+        function get_type_color(type_name) {
+            switch(type_name) {
+                case "NORMAL": return "Gainsboro";
+                case "FIGHTING": return "GoldenRod";
+                case "DARK": return "Black";
+                case "GHOST": return "DarkMagenta";
+                case "PSYCHIC": return "DeepPink";
+                case "FAIRY": return "Fuchsia";
+                case "DRAGON": return "Indigo";
+                case "ICE": return "LightCyan";
+                case "ROCK": return "Sienna";
+                case "STEEL": return "SlateGrey";
+                case "GROUND": return "Peru";
+                case "GRASS": return "LimeGreen";
+                case "FIRE": return "Crimson";
+                case "WATER": return "DarkBlue";
+                case "POISON": return "DarkOrchid";
+                case "FLYING": return "CornflowerBlue";
+                case "BUG": return "DarkOliveGreen";
+                case "ELECTRIC": return "Yellow";
+                default:
+                    console.log(type_name);
+                    return "transparent";
+            }
+        }
+
+        function column_color_renderer(field1, field2, value, record, cell) {
+            var type1 = field1 && record.get(field1);
+            var type2 = field2 && record.get(field2);
+            if(type2) {
+                cell.setStyle({
+                    "text-shadow": "2px 2px 10px white, 2px 2px 10px white",
+                    "background-image": "linear-gradient(90deg, " + get_type_color(type1) + ", " + get_type_color(type2) + ")",
+                    "background-color": "transparent"
+                });
+            }
+            else {
+                cell.setStyle({
+                    "text-shadow": "2px 2px 10px white, 2px 2px 10px white",
+                    "background-image": "none",
+                    "background-color": get_type_color(type1)
+                });
+            }
+            return value;
+        }
+
+        function get_cp(stats, level, atk, def, sta) {
+            return Math.floor(((stats.base_attack + atk) * Math.pow(stats.base_defense + def, 0.5) * Math.pow(stats.base_stamina + sta, 0.5) * Math.pow(player_level.cpMultiplier[level - 1], 2)) / 10);
+        }
+
+        function get_max_levels(stats) {
+            var res = [];
+            // always put lvl 41 100% for Master League
+            res.push([get_cp(stats, 41, 15, 15, 15), 41, 15, 15, 15]);
+            var mega = [];
+            var ultra = [];
+            for(var level = 41; level > 0; level--) {
+                for(var sta = 15; sta >= 0; sta--) {
+                    for(var def = 15; def >= 0; def--) {
+                        for(var atk = 15; atk >= 0; atk--) {
+                            let cp = get_cp(stats, level, atk, def, sta);
+                            if(cp > 0 && cp <= 1500) {
+                                mega.push([cp, level, atk, def, sta]);
+                            }
+                            else if(cp > 1500 && cp <= 2500) {
+                                ultra.push([cp, level, atk, def, sta]);
+                            }
+                        }
+                    }
+                }
+            }
+            // sort by CP ASC, then by level ASC, finally take last element
+            if(mega.length > 0) {
+                mega.sort(function(a, b) {
+                    for(var i = 0; i < 5; i++) {
+                        if(a[i] < b[i]) {
+                            return -1;
+                        }
+                        if(a[i] > b[i]) {
+                            return 1;
+                        }
+                    }
+                    return 0;
+                });
+                res.push(mega.pop());
+            }
+            if(ultra.length > 0) {
+                ultra.sort(function(a, b) {
+                    for(var i = 0; i < 5; i++) {
+                        if(a[i] < b[i]) {
+                            return -1;
+                        }
+                        if(a[i] > b[i]) {
+                            return 1;
+                        }
+                    }
+                    return 0;
+                });
+                res.push(ultra.pop());
+            }
+
+            return res;
+        }
+
+        var player_level;
+
+        Ext.application({
+            name: 'PokémonMovesets',
+
+            launch: function () {
+                Ext.create('Ext.data.Store', {
+                    storeId: 'data',
+                    fields: [
+                    //   "templateId",
+                    //   "avatarCustomization",
+                    //   "backgroundModeSettings",
+                    //   "badgeSettings",
+                    //   "battleHubBadgeSettings",
+                    //   "battleHubOrderSettings",
+                    //   "battleSettings",
+                    //   "belugaPokemonWhitelist",
+                    //   "buddyActivitySettings",
+                    //   "buddyActivityCategorySettings",
+                    //   "buddyEmotionLevelSettings",
+                    //   "buddyEncounterCameoSettings",
+                    //   "buddyHungerSettings",
+                    //   "buddyInteractionSettings",
+                    //   "buddyLevelSettings",
+                    //   "buddySwapSettings",
+                    //   "buddyWalkSettings",
+                    //   "invasionNpcDisplaySettings",
+                    //   "combatCompetitiveSeasonSettings",
+                    //   "combatLeague",
+                    //   "combatLeagueSettings",
+                    //   "combatType",
+                    //   "combatRankingProtoSettings",
+                    //   "combatSettings",
+                    //   "combatStatStageSettings",
+                        "combatMove",
+                    //   "encounterSettings",
+                    //   "exRaidSettings",
+                    //   "formSettings",
+                    //   "friendshipMilestoneSettings",
+                    //   "gymBadgeSettings",
+                    //   "gymLevel",
+                    //   "iapCategoryDisplay",
+                    //   "iapSettings",
+                    //   "pokestopInvasionAvailabilitySettings",
+                    //   "itemSettings",
+                    //   "loadingScreenSettings",
+                    //   "limitedPurchaseSkuSettings",
+                    //   "luckyPokemonSettings",
+                    //   "onboardingV2Settings",
+                    //   "partyRecommendationSettings",
+                    //   "platypusRolloutSettings",
+                        "playerLevel",
+                    //   "pokecoinPurchaseDisplayGmt",
+                    //   "pokemonScaleSettings",
+                    //   "typeEffective",
+                    //   "pokemonUpgrades",
+                    //   "questSettings",
+                    //   "smeargleMovesSettings",
+                    //   "genderSettings",
+                    //   "combatNpcTrainer",
+                    //   "combatNpcPersonality",
+                        "pokemonSettings",
+                    //   "vsSeekerClientSettings",
+                    //   "vsSeekerLootProto",
+                    //   "vsSeekerPokemonRewards",
+                    //   "moveSettings",
+                    //   "weatherAffinities",
+                    //   "weatherBonusSettings",
+                    //   "adventureSyncV2Gmt",
+                    //   "iapItemDisplay",
+                    //   "camera",
+                    //   "moveSequenceSettings"
+                    ],
+                    proxy: {
+                        type: 'ajax',
+                        url: 'https://raw.githubusercontent.com/pokemongo-dev-contrib/pokemongo-game-master/master/versions/latest/GAME_MASTER.json',
+                        useDefaultXhrHeader: false,
+                        reader: {
+                            type: 'json',
+                            rootProperty: 'itemTemplates'
+                        }
+                    },
+                    autoLoad: true,
+                    listeners: {
+                        load: function(store, records) {
+                            var pokemon_store = Ext.data.StoreManager.lookup('temp_pokemon');
+                            var moves_store = Ext.data.StoreManager.lookup('moves');
+                            var pokemon = [];
+                            var moves = [];
+                            for(var i = 0; i < records.length; i++) {
+                                var pokemonSettings = records[i].get('pokemonSettings');
+                                if(pokemonSettings) {
+                                    pokemon.push(pokemonSettings);
+                                }
+                                else {
+                                    var combatMove = records[i].get('combatMove');
+                                    if(combatMove) {
+                                        moves.push(combatMove);
+                                    }
+                                    else {
+                                        var playerLevel = records[i].get('playerLevel');
+                                        if(playerLevel) {
+                                            player_level = playerLevel;
+                                        }
+                                    }
+                                }
+                            }
+                            pokemon_store.setData(pokemon);
+                            moves_store.setData(moves);
+
+                            // cleanup forms
+                            var cleaned_up_pokemon = [];
+                            pokemon_store.getGroups().each(function(group) {
+                                var forms = {};
+                                group.each(function(form) {
+                                    var temp = form.get('form');
+                                    forms[temp?temp:'-'] = form.getData();
+                                });
+
+                                if('-' in forms) {
+                                    for(var form in forms) {
+                                        if(form == '-') {
+                                            cleaned_up_pokemon.push(forms[form]);
+                                        }
+                                        else if(forms[form].type != forms['-'].type ||
+                                            forms[form].type2 != forms['-'].type2 ||
+                                            forms[form].stats.base_atk != forms['-'].stats.base_atk ||
+                                            forms[form].stats.base_def != forms['-'].stats.base_def ||
+                                            forms[form].stats.base_sta != forms['-'].stats.base_sta) {
+                                            cleaned_up_pokemon.push(forms[form]);
+                                        }
+                                    }
+                                }
+                                else {
+                                    for(var form in forms) {
+                                        cleaned_up_pokemon.push(forms[form]);
+                                    }
+                                }
+                            });
+                            var pokemon_store = Ext.data.StoreManager.lookup('pokemon');
+                            pokemon_store.setData(cleaned_up_pokemon);
+
+                            var movesets = [];
+                            pokemon_store.each(function(pokemon) {
+                                var quickMoves = pokemon.get('quickMoves') || [],
+                                    chargedMoves = pokemon.get('cinematicMoves') || [],
+                                    pokemonId = pokemon.get('pokemonId'),
+                                    levels = get_max_levels(pokemon.get('stats'));
+                                if(pokemonId in LEGACY_QUICK_MOVES) {
+                                    quickMoves = Ext.Array.merge(quickMoves, LEGACY_QUICK_MOVES[pokemonId]);
+                                }
+                                if(pokemonId in LEGACY_CHARGED_MOVES) {
+                                    chargedMoves = Ext.Array.merge(chargedMoves, LEGACY_CHARGED_MOVES[pokemonId]);
+                                }
+
+                                for(var f = 0; f < quickMoves.length; f++) {
+                                    var fastMove = moves_store.getById(quickMoves[f]);
+                                    for(var c = 0; c < chargedMoves.length; c++) {
+                                        var chargedMove = moves_store.getById(chargedMoves[c]);
+                                        for(var level in levels) {
+                                            movesets.push({
+                                                pokemon_id: pokemonId,
+                                                pokemon_type1: pokemon.get('type').replace(/^POKEMON_TYPE_/, ''),
+                                                pokemon_type2: (pokemon.get('type2') || '').replace(/^POKEMON_TYPE_/, ''),
+                                                base_atk: pokemon.get('base_atk'),
+                                                base_def: pokemon.get('base_def'),
+                                                base_sta: pokemon.get('base_sta'),
+                                                form: (pokemon.get('form') || '').replace(pokemonId + '_', ''),
+                                                cp: level[0],
+                                                level: level[1],
+                                                atk: level[2],
+                                                def: level[3],
+                                                sta: level[4],
+                                                cpm: player_level.cpMultiplier[level[1] - 1],
+                                                fast_move: fastMove.get('uniqueId'),
+                                                fast_type: fastMove.get('type').replace(/^POKEMON_TYPE_/, ''),
+                                                fast_power: fastMove.get('power'),
+                                                fast_energy: fastMove.get('energy_delta'),
+                                                fast_duration: fastMove.get('duration_turns'),
+                                                fast_legacy: (pokemonId in LEGACY_QUICK_MOVES) && LEGACY_QUICK_MOVES[pokemonId].includes(fastMove.get('uniqueId')),
+                                                charged_move: chargedMove.get('uniqueId'),
+                                                charged_type: chargedMove.get('type').replace(/^POKEMON_TYPE_/, ''),
+                                                charged_power: chargedMove.get('power'),
+                                                charged_energy: chargedMove.get('energy_delta'),
+                                                charged_legacy: (pokemonId in LEGACY_CHARGED_MOVES) && LEGACY_CHARGED_MOVES[pokemonId].includes(chargedMove.get('uniqueId'))
+                                            });
+                                        }
+                                    }
+                                }
+                            });
+                            Ext.data.StoreManager.lookup('movesets').setData(movesets);
+                        }
+                    }
+                });
+
+                Ext.create('Ext.data.Store', {
+                    storeId: 'temp_pokemon',
+                    groupField: 'pokemonId',
+                    fields: [
+                        "pokemonId",
+                        "type",
+                        "type2",
+                        "stats",
+                        "quickMoves",
+                        "cinematicMoves",
+                        "form"
+                    ],
+                    data: [],
+                    proxy: {
+                        type: 'memory',
+                        reader: 'json'
+                    }
+                });
+
+                Ext.create('Ext.data.Store', {
+                    storeId: 'pokemon',
+                    fields: [
+                        "pokemonId",
+                        "type",
+                        "type2",
+                        "stats",
+                        "quickMoves",
+                        "cinematicMoves",
+                        "form"
+                    ],
+                    data: [],
+                    proxy: {
+                        type: 'memory',
+                        reader: 'json'
+                    }
+                });
+
+                Ext.define('CombatMove', {
+                    extend: 'Ext.data.Model',
+                    idProperty: 'uniqueId',
+                    fields: [
+                        "uniqueId",
+                        "type",
+                        "power",
+                        "energyDelta",
+                        "durationTurns"
+                    ]
+                });
+
+                Ext.create('Ext.data.Store', {
+                    storeId: 'moves',
+                    model: 'CombatMove',
+                    data: [],
+                    proxy: {
+                        type: 'memory',
+                        reader: 'json'
+                    }
+                });
+
+                Ext.create('Ext.data.Store', {
+                    storeId: 'movesets',
+                    fields: [
+                        "pokemon_id",
+                        "pokemon_type1",
+                        "pokemon_type2",
+                        {name: "base_atk", type: "int"},
+                        {name: "base_def", type: "int"},
+                        {name: "base_sta", type: "int"},
+                        "form",
+                        {name: "cp", type: "int"},
+                        {name: "level", type: "int"},
+                        {name: "atk", type: "int"},
+                        {name: "def", type: "int"},
+                        {name: "sta", type: "int"},
+                        {name: "cpm", type: "float"},
+                        "fast_move",
+                        "fast_type",
+                        {name: "fast_power", type: "float"},
+                        {name: "fast_energy", type: "int"},
+                        {name: "fast_duration", type: "int"},
+                        {name: "fast_legacy", type: "bool"},
+                        "charged_move",
+                        "charged_type",
+                        {name: "charged_power", type: "float"},
+                        {name: "charged_energy", type: "int"},
+                        {name: "charged_legacy", type: "bool"},
+                        {name: "tpc", type: "int"},
+                        {name: "dpc", type: "float"},
+                        {name: "dpc_tpc", type: "float"}
+                    ],
+                    data: [],
+                    proxy: {
+                        type: 'memory',
+                        reader: 'json'
+                    }
+                });
+
+                Ext.Viewport.add({
+                    xtype: 'grid',
+                    store: 'movesets',
+                    plugins: [{
+                        type: 'gridviewoptions'
+                    }],
+                    columns: [
+                        { text: 'Pokémon',  dataIndex: 'pokemon_id', flex: 1, minWidth: 120, renderer: function(value, record, dataIndex, cell) {
+                            return column_color_renderer("pokemon_type1", "pokemon_type2", value, record, cell);
+                        } },
+                        { text: 'Type', dataIndex: 'pokemon_type1', width: 90 },
+                        { text: 'Type2', dataIndex: 'pokemon_type2', width: 90 },
+                        { text: 'Base ATK', dataIndex: 'base_atk', width: 100, xtype: 'numbercolumn', format: '0' },
+                        { text: 'Base DEF', dataIndex: 'base_def', width: 100, xtype: 'numbercolumn', format: '0' },
+                        { text: 'Base STA', dataIndex: 'base_sta', width: 100, xtype: 'numbercolumn', format: '0' },
+                        { text: 'Form', dataIndex: 'form', width: 100 },
+                        { text: 'CP', dataIndex: 'cp', width: 70, xtype: 'numbercolumn', format: '0' },
+                        { text: 'Level', dataIndex: 'level', width: 70, xtype: 'numbercolumn', format: '0' },
+                        { text: 'Atk', dataIndex: 'atk', width: 70, xtype: 'numbercolumn', format: '0' },
+                        { text: 'Def', dataIndex: 'def', width: 70, xtype: 'numbercolumn', format: '0' },
+                        { text: 'Sta', dataIndex: 'sta', width: 70, xtype: 'numbercolumn', format: '0' },
+                        { text: 'F Move', dataIndex: 'fast_move', flex: 1, minWidth: 120, renderer: function(value, record, dataIndex, cell) {
+                            return column_color_renderer("fast_type", false, value, record, cell);
+                        } },
+                        { text: 'F Type', dataIndex: 'fast_type', width: 90 },
+                        { text: 'F Power', dataIndex: 'fast_power', width: 90, xtype: 'numbercolumn' },
+                        { text: 'F Energy', dataIndex: 'fast_energy', width: 90, xtype: 'numbercolumn', format: '0' },
+                        { text: 'F Duration', dataIndex: 'fast_duration', width: 90, xtype: 'numbercolumn', format: '0' },
+                        { text: 'F Legacy', dataIndex: 'fast_legacy', width: 90, xtype: 'booleancolumn' },
+                        { text: 'C Move', dataIndex: 'charged_move', flex: 1, minWidth: 120, renderer: function(value, record, dataIndex, cell) {
+                            return column_color_renderer("charged_type", false, value, record, cell);
+                        } },
+                        { text: 'C Type', dataIndex: 'charged_type', width: 90 },
+                        { text: 'C Power', dataIndex: 'charged_power', width: 90, xtype: 'numbercolumn' },
+                        { text: 'C Energy', dataIndex: 'charged_energy', width: 90, xtype: 'numbercolumn', format: '0' },
+                        { text: 'C Legacy', dataIndex: 'charged_legacy', width: 90, xtype: 'booleancolumn' },
+                        { text: 'TPC', dataIndex: 'tpc', width: 60, xtype: 'numbercolumn', format: '0' },
+                        { text: 'DPC', dataIndex: 'dpc', width: 100, xtype: 'numbercolumn' },
+                        { text: 'DPC / TPC', dataIndex: 'dpc_tpc', width: 100, xtype: 'numbercolumn' }
+                    ],
+
+                    layout: 'fit',
+                    fullscreen: true
+                });
+
+                var sort_options = [
+                    { text: '-',  value: null },
+                    { text: 'Pokémon',  value: 'pokemon_id' },
+                    { text: 'Type', value: 'pokemon_type1' },
+                    { text: 'Type2', value: 'pokemon_type2' },
+                    { text: 'Base ATK', value: 'base_atk' },
+                    { text: 'Base DEF', value: 'base_def' },
+                    { text: 'Base STA', value: 'base_sta' },
+                    { text: 'Form', value: 'form' },
+                    { text: 'CP', value: 'cp' },
+                    { text: 'Level', value: 'level' },
+                    { text: 'ATK', value: 'atk' },
+                    { text: 'DEF', value: 'def' },
+                    { text: 'STA', value: 'sta' },
+                    { text: 'Fast Move', value: 'fast_move' },
+                    { text: 'Fast Type', value: 'fast_type' },
+                    { text: 'Fast Power', value: 'fast_power' },
+                    { text: 'Fast Energy', value: 'fast_energy' },
+                    { text: 'Fast Duration', value: 'fast_duration' },
+                    { text: 'Fast Legacy', value: 'fast_legacy' },
+                    { text: 'Charged Move', value: 'charged_move' },
+                    { text: 'Charged Type', value: 'charged_type' },
+                    { text: 'Charged Power', value: 'charged_power' },
+                    { text: 'Charged Energy', value: 'charged_energy' },
+                    { text: 'Charged Legacy', value: 'charged_legacy' },
+                    { text: 'TPC', value: 'tpc' },
+                    { text: 'DPC', value: 'dpc' },
+                    { text: 'DPC / TPC', value: 'dpc_tpc' }
+                ];
+
+                Ext.Viewport.add({
+                    xtype: 'panel',
+                    itemId: 'sort-panel',
+                    docked: 'left',
+                    minWidth: 300,
+                    floated: true,
+                    hidden: true,
+                    title: 'Sorting',
+                    items: [{
+                        xtype: 'fieldset',
+                        title: 'First',
+                        items: [{
+                            xtype: 'selectfield',
+                            itemId: 'field',
+                            options: sort_options
+                        }, {
+                            xtype: 'checkboxfield',
+                            itemId: 'direction',
+                            label: 'Reverse'
+                        }]
+                    }, {
+                        xtype: 'fieldset',
+                        title: 'Second',
+                        items: [{
+                            xtype: 'selectfield',
+                            itemId: 'field',
+                            options: sort_options
+                        }, {
+                            xtype: 'checkboxfield',
+                            itemId: 'direction',
+                            label: 'Reverse'
+                        }]
+                    }, {
+                        xtype: 'fieldset',
+                        title: 'Third',
+                        items: [{
+                            xtype: 'selectfield',
+                            itemId: 'field',
+                            options: sort_options
+                        }, {
+                            xtype: 'checkboxfield',
+                            itemId: 'direction',
+                            label: 'Reverse'
+                        }]
+                    }, {
+                        xtype: 'button',
+                        text: 'Apply',
+                        handler: function() {
+                        var sorting = [];
+                            Ext.Array.forEach(Ext.ComponentQuery.query('fieldset'), function(fieldset) {
+                                var field = fieldset.getComponent('field').getValue();
+                                if(field) {
+                                    sorting.push({
+                                        property: field,
+                                        direction: fieldset.getComponent('direction').getChecked()?'DESC':'ASC'
+                                    });
+                                }
+                            });
+                            Ext.data.StoreManager.lookup('movesets').sort(sorting);
+                            Ext.ComponentQuery.query('#sort-panel')[0].hide();
+                        }
+                    }]
+                });
+
+                var type_options = [{
+                    text: '-',
+                    value: null
+                },
+                {
+                    text: 'BUG',
+                    value: 'BUG'
+                },
+                {
+                    text: 'DARK',
+                    value: 'DARK'
+                },
+                {
+                    text: 'DRAGON',
+                    value: 'DRAGON'
+                },
+                {
+                    text: 'ELECTRIC',
+                    value: 'ELECTRIC'
+                },
+                {
+                    text: 'FAIRY',
+                    value: 'FAIRY'
+                },
+                {
+                    text: 'FIGHTING',
+                    value: 'FIGHTING'
+                },
+                {
+                    text: 'FIRE',
+                    value: 'FIRE'
+                },
+                {
+                    text: 'FLYING',
+                    value: 'FLYING'
+                },
+                {
+                    text: 'GHOST',
+                    value: 'GHOST'
+                },
+                {
+                    text: 'GRASS',
+                    value: 'GRASS'
+                },
+                {
+                    text: 'GROUND',
+                    value: 'GROUND'
+                },
+                {
+                    text: 'ICE',
+                    value: 'ICE'
+                },
+                {
+                    text: 'NORMAL',
+                    value: 'NORMAL'
+                },
+                {
+                    text: 'PSYCHIC',
+                    value: 'PSYCHIC'
+                },
+                {
+                    text: 'POISON',
+                    value: 'POISON'
+                },
+                {
+                    text: 'ROCK',
+                    value: 'ROCK'
+                },
+                {
+                    text: 'STEEL',
+                    value: 'STEEL'
+                },
+                {
+                    text: 'WATER',
+                    value: 'WATER'
+                }];
+
+                Ext.Viewport.add({
+                    xtype: 'panel',
+                    itemId: 'filter-panel',
+                    docked: 'right',
+                    minWidth: 300,
+                    floated: true,
+                    hidden: true,
+                    title: 'Filters',
+                    items: [{
+                        xtype: 'selectfield',
+                        label: 'CP',
+                        options: [{
+                            text: '-',
+                            value: null
+                        }, {
+                            text: 'Mega (CP <= 1500)',
+                            value: {min: 0, max: 1500}
+                        }, {
+                            text: 'Ultra (1500 < CP <= 2500)',
+                            value: {min: 1500, max: 2500}
+                        }, {
+                            text: 'Master (2500 < CP)',
+                            value: {min: 2500, max: 9999}
+                        }]
+                    }, {
+                        xtype: 'selectfield',
+                        itemId: 'pokemon-filter',
+                        label: 'Pokémon',
+                        options: []
+                    }, {
+                        xtype: 'selectfield',
+                        label: 'Pokémon Type',
+                        options: type_options
+                    }, {
+                        xtype: 'selectfield',
+                        itemId: 'fast-move-filter',
+                        label: 'Fast Move',
+                        options: []
+                    }, {
+                        xtype: 'selectfield',
+                        label: 'Fast Move Type',
+                        options: type_options
+                    }, {
+                        xtype: 'selectfield',
+                        itemId: 'charged-move-filter',
+                        label: 'Charged Move',
+                        options: []
+                    }, {
+                        xtype: 'selectfield',
+                        label: 'Charged Move Type',
+                        options: type_options
+                    }, {
+                        xtype: 'button',
+                        text: 'Apply',
+                        handler: function(button) {
+                            var fields = button.getParent().query('field'),
+                                filters = [];
+                            Ext.Array.forEach(fields, function(field) {
+                                var value = field.getValue();
+
+                                if(value) {
+                                    switch(field.getLabel()) {
+                                        case 'CP':
+                                            filters.push((function(value) {
+                                                return function(item) {
+                                                var cp = item.get('cp');
+                                                return cp > value.min && cp <= value.max;
+                                                };
+                                            })(value));
+                                            break;
+                                        case 'Pokémon':
+                                            filters.push((function(value) {
+                                                return function(item) {
+                                                return item.get('pokemon_id') == value;
+                                                };
+                                            })(value));
+                                            break;
+                                        case 'Pokémon Type':
+                                            filters.push((function(value) {
+                                                return function(item) {
+                                                return item.get('pokemon_type1') == value || item.get('pokemon_type2') == value;
+                                                };
+                                            })(value));
+                                            break;
+                                        case'Fast Move':
+                                            filters.push((function(value) {
+                                                return function(item) {
+                                                return item.get('fast_move') == value;
+                                                };
+                                            })(value));
+                                            break;
+                                        case'Fast Move Type':
+                                            filters.push((function(value) {
+                                                return function(item) {
+                                                return item.get('fast_type') == value;
+                                                };
+                                            })(value));
+                                            break;
+                                        case'Charged Move':
+                                            filters.push((function(value) {
+                                                return function(item) {
+                                                return item.get('charged_move') == value;
+                                                };
+                                            })(value));
+                                            break;
+                                        case'Charged Move Type':
+                                            filters.push((function(value) {
+                                                return function(item) {
+                                                return item.get('charged_type') == value;
+                                                };
+                                            })(value));
+                                            break;
+                                    }
+                                }
+                            });
+
+                            var store = Ext.data.StoreManager.lookup('movesets');
+                            store.clearFilter(true);
+                            store.filter(filters);
+                            Ext.ComponentQuery.query('#filter-panel')[0].hide();
+                        }
+                    }]
+                });
+
+                Ext.Viewport.add({
+                    xtype: 'titlebar',
+                    docked: 'top',
+                    title: 'Pokémon Movesets',
+                    items: [{
+                        align: 'left',
+                        text: 'Sorting',
+                        style: 'color: white',
+                        handler: function() {
+                            Ext.ComponentQuery.query('#sort-panel')[0].show();
+                        }
+                    }, {
+                        align: 'right',
+                        text: 'Filters',
+                        style: 'color: white',
+                        handler: function() {
+                            Ext.ComponentQuery.query('#filter-panel')[0].show();
+                        }
+                    }]
+                });
+            }
+        });
+    </script>
+  </head>
+  <body>
+  </body>
+</html>
