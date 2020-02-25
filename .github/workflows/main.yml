@@ -8,7 +8,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Publish to GitHub Pages
-      uses: tsunematsu21/actions-publish-gh-pages@v1.0.0
+    - name: GitHub Pages v3
+      uses: peaceiris/actions-github-pages@v3.1.12
       with:
-        branch: master
+        publish_branch: master
+        publish_dir: .
