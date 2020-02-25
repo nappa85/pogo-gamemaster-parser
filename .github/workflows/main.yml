@@ -13,3 +13,4 @@ jobs:
       with:
         publish_branch: master
         publish_dir: .
+        github_token: ${{ secrets.GITHUB_TOKEN }}
