@@ -236,7 +236,7 @@
         }
 
         function get_cp(stats, level, atk, def, sta) {
-            return Math.floor(((stats.base_attack + atk) * Math.pow(stats.base_defense + def, 0.5) * Math.pow(stats.base_stamina + sta, 0.5) * Math.pow(player_level.cpMultiplier[level - 1], 2)) / 10);
+            return Math.floor(((stats.baseAttack + atk) * Math.pow(stats.baseDefense + def, 0.5) * Math.pow(stats.baseStamina + sta, 0.5) * Math.pow(player_level.cpMultiplier[level - 1], 2)) / 10);
         }
 
         function get_max_levels(stats) {
