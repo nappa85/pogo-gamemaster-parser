@@ -209,6 +209,7 @@ static LEGACY_CHARGED_MOVES: Lazy<HashMap<String, Vec<&'static str>>> = Lazy::ne
     res.insert(String::from("FERALIGATR"), vec!["HYDRO_CANNON"]);
     res.insert(String::from("PIDGEOT"), vec!["AIR_CUTTER"]);
     res.insert(String::from("SNORLAX"), vec!["RETURN"]);
+    res.insert(String::from("RHYPERIOR"), vec!["ROCK_WRECKER"]);
     res
 });
 
@@ -401,55 +402,53 @@ async fn main() -> Result<(), ()> {
     info!("Here we go!");
 
     // very aggressive
-    iter(movesets).for_each_concurrent(Some(10), |mut mvs| async move {
+    iter(movesets).for_each_concurrent(Some(10), |mvs| async move {
+        if mvs.is_empty() {
+            return;
+        }
+
+        let movesets = mvs.into_iter().map(|mv| json!({
+            "pokemon_id": mv.pokemon.pokemon_id.as_str(),
+            "pokemon_type1": mv.pokemon.r#type.replacen("POKEMON_TYPE_", "", 1),
+            "pokemon_type2": mv.pokemon.type2.as_ref().map(|s| s.replacen("POKEMON_TYPE_", "", 1)),
+            "base_atk": mv.pokemon.stats.base_attack,
+            "base_def": mv.pokemon.stats.base_defense,
+            "base_sta": mv.pokemon.stats.base_stamina,
+            "form": mv.pokemon.form.as_ref().map(|s| s.replacen(&format!("{}_", mv.pokemon.pokemon_id), "", 1)),
+            "cp": mv.cp,
+            "level": mv.level,
+            "atk": mv.atk,
+            "def": mv.def,
+            "sta": mv.sta,
+            "cpm": mv.cpm,
+            "fast_move": mv.fast_move.unique_id.as_str(),
+            "fast_type": mv.fast_move.r#type.replacen("POKEMON_TYPE_", "", 1),
+            "fast_power": mv.fast_move.power,
+            "fast_energy": mv.fast_move.energy_delta,
+            "fast_duration": mv.fast_move.duration_turns,
+            "fast_legacy": mv.fast_legacy,
+            "charged_move": mv.charged_move.unique_id.as_str(),
+            "charged_type": mv.charged_move.r#type.replacen("POKEMON_TYPE_", "", 1),
+            "charged_power": mv.charged_move.power,
+            "charged_energy": mv.charged_move.energy_delta,
+            "charged_legacy": mv.charged_legacy,
+            "tpc": mv.tpc,
+            "dpc": mv.dpc,
+        })).collect::<Vec<Value>>();
+
         let client = Client::new();// not good
-        'outer: loop {
-            if mvs.is_empty() {
-                break;
-            }
-
-            let movesets = mvs.drain(0..1000.min(mvs.len())).map(|mv| json!({
-                "pokemon_id": mv.pokemon.pokemon_id.as_str(),
-                "pokemon_type1": mv.pokemon.r#type.as_str(),
-                "pokemon_type2": mv.pokemon.type2.as_ref().map(|s| s.as_str()),
-                "base_atk": mv.pokemon.stats.base_attack,
-                "base_def": mv.pokemon.stats.base_defense,
-                "base_sta": mv.pokemon.stats.base_stamina,
-                "form": mv.pokemon.form.as_ref().map(|s| s.as_str()),
-                "cp": mv.cp,
-                "level": mv.level,
-                "atk": mv.atk,
-                "def": mv.def,
-                "sta": mv.sta,
-                "cpm": mv.cpm,
-                "fast_move": mv.fast_move.unique_id.as_str(),
-                "fast_type": mv.fast_move.r#type.as_str(),
-                "fast_power": mv.fast_move.power,
-                "fast_energy": mv.fast_move.energy_delta,
-                "fast_duration": mv.fast_move.duration_turns,
-                "fast_legacy": mv.fast_legacy,
-                "charged_move": mv.charged_move.unique_id.as_str(),
-                "charged_type": mv.charged_move.r#type.as_str(),
-                "charged_power": mv.charged_move.power,
-                "charged_energy": mv.charged_move.energy_delta,
-                "charged_legacy": mv.charged_legacy,
-                "tpc": mv.tpc,
-                "dpc": mv.dpc,
-            })).collect::<Vec<Value>>();
-
-            loop {
-                if let Ok(res) = client.post(TARGET.as_str())
-                    .json(&movesets)
-                    .send()
-                    .await
-                    .map_err(|e| error!("Transmission error: {}", e)) {
-                    if res.status().is_success() {
-                        info!("Inserted {} combinations: {:?}", movesets.len(), res.text().await);
-                        continue 'outer;
-                    }
-                    else {
-                        error!("Creation error: {:?}", res.text().await);
-                    }
+        loop {
+            if let Ok(res) = client.post(TARGET.as_str())
+                .json(&movesets)
+                .send()
+                .await
+                .map_err(|e| error!("Transmission error: {}", e)) {
+                if res.status().is_success() {
+                    info!("Inserted {} combinations: {:?}", movesets.len(), res.text().await);
+                    break;
+                }
+                else {
+                    error!("Creation error: {:?}", res.text().await);
                 }
             }
         }
