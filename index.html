@@ -868,6 +868,7 @@
                                                 return function(item) {
                                                 var cp = item.get('cp'),
                                                     range = value.split(',');
+console.log(range);
                                                 return cp > (range[0] * 1) && cp <= (range[1] * 1);
                                                 };
                                             })(value));
