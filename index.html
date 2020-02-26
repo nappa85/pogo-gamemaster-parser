@@ -867,8 +867,8 @@
                                             filters.push((function(value) {
                                                 return function(item) {
                                                 var cp = item.get('cp'),
-							range = value.split(',');
-                                                return cp > range[0] && cp <= range[1];
+                                                    range = value.split(',');
+                                                return cp > (range[0] * 1) && cp <= (range[1] * 1);
                                                 };
                                             })(value));
                                             break;
