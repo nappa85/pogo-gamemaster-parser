@@ -419,9 +419,9 @@
                                         }
                                         else if(forms[form].type != forms['-'].type ||
                                             forms[form].type2 != forms['-'].type2 ||
-                                            forms[form].stats.base_atk != forms['-'].stats.base_atk ||
-                                            forms[form].stats.base_def != forms['-'].stats.base_def ||
-                                            forms[form].stats.base_sta != forms['-'].stats.base_sta) {
+                                            forms[form].stats.baseAttack != forms['-'].stats.baseAttack ||
+                                            forms[form].stats.baseDefense != forms['-'].stats.baseDefense ||
+                                            forms[form].stats.baseStamina != forms['-'].stats.baseStamina) {
                                             cleaned_up_pokemon.push(forms[form]);
                                         }
                                     }
@@ -447,7 +447,7 @@
                                 if(pokemonId in LEGACY_CHARGED_MOVES) {
                                     chargedMoves = Ext.Array.merge(chargedMoves, LEGACY_CHARGED_MOVES[pokemonId]);
                                 }
-
+console.log(levels);
                                 for(var f = 0; f < quickMoves.length; f++) {
                                     var fastMove = moves_store.getById(quickMoves[f]);
                                     for(var c = 0; c < chargedMoves.length; c++) {
@@ -457,9 +457,9 @@
                                                 pokemon_id: pokemonId,
                                                 pokemon_type1: pokemon.get('type').replace(/^POKEMON_TYPE_/, ''),
                                                 pokemon_type2: (pokemon.get('type2') || '').replace(/^POKEMON_TYPE_/, ''),
-                                                base_atk: pokemon.get('base_atk'),
-                                                base_def: pokemon.get('base_def'),
-                                                base_sta: pokemon.get('base_sta'),
+                                                base_atk: pokemon.get('baseAttack'),
+                                                base_def: pokemon.get('baseDefense'),
+                                                base_sta: pokemon.get('baseStamina'),
                                                 form: (pokemon.get('form') || '').replace(pokemonId + '_', ''),
                                                 cp: level[0],
                                                 level: level[1],
@@ -470,13 +470,13 @@
                                                 fast_move: fastMove.get('uniqueId'),
                                                 fast_type: fastMove.get('type').replace(/^POKEMON_TYPE_/, ''),
                                                 fast_power: fastMove.get('power'),
-                                                fast_energy: fastMove.get('energy_delta'),
-                                                fast_duration: fastMove.get('duration_turns'),
+                                                fast_energy: fastMove.get('energyDelta'),
+                                                fast_duration: fastMove.get('durationTurns'),
                                                 fast_legacy: (pokemonId in LEGACY_QUICK_MOVES) && LEGACY_QUICK_MOVES[pokemonId].includes(fastMove.get('uniqueId')),
                                                 charged_move: chargedMove.get('uniqueId'),
                                                 charged_type: chargedMove.get('type').replace(/^POKEMON_TYPE_/, ''),
                                                 charged_power: chargedMove.get('power'),
-                                                charged_energy: chargedMove.get('energy_delta'),
+                                                charged_energy: chargedMove.get('energyDelta'),
                                                 charged_legacy: (pokemonId in LEGACY_CHARGED_MOVES) && LEGACY_CHARGED_MOVES[pokemonId].includes(chargedMove.get('uniqueId'))
                                             });
                                         }
