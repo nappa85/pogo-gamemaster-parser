@@ -447,7 +447,7 @@
                                 if(pokemonId in LEGACY_CHARGED_MOVES) {
                                     chargedMoves = Ext.Array.merge(chargedMoves, LEGACY_CHARGED_MOVES[pokemonId]);
                                 }
-console.log(levels);
+
                                 for(var f = 0; f < quickMoves.length; f++) {
                                     var fastMove = moves_store.getById(quickMoves[f]);
                                     for(var c = 0; c < chargedMoves.length; c++) {
@@ -870,7 +870,6 @@ console.log(levels);
                                                     max = (range[1] * 1);
                                                 return function(item) {
                                                 var cp = item.get('cp');
-console.log(cp, min, max);
                                                 return cp > min && cp <= max;
                                                 };
                                             })(value));
