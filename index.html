@@ -817,13 +817,13 @@
                             value: null
                         }, {
                             text: 'Mega (CP <= 1500)',
-                            value: {min: 0, max: 1500}
+                            value: "0,1500"
                         }, {
                             text: 'Ultra (1500 < CP <= 2500)',
-                            value: {min: 1500, max: 2500}
+                            value: "1500,2500"
                         }, {
                             text: 'Master (2500 < CP)',
-                            value: {min: 2500, max: 9999}
+                            value: "2500,9999"
                         }]
                     }, {
                         xtype: 'selectfield',
@@ -866,8 +866,9 @@
                                         case 'CP':
                                             filters.push((function(value) {
                                                 return function(item) {
-                                                var cp = item.get('cp');
-                                                return cp > value.min && cp <= value.max;
+                                                var cp = item.get('cp'),
+							range = value.split(',');
+                                                return cp > range[0] && cp <= range[1];
                                                 };
                                             })(value));
                                             break;
