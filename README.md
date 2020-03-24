@@ -1,6 +1,6 @@
 # PoGo-GameMaster-Parser
 
-## Prject history
+## Project history
 
 This project was born as a Rust program that parses the GameMaster, pushing the resulting combinations (aka every moveset and IV combination) into a database.<br />
 To consume the database data, it's needed also a frontend, with a minimal backend to retrieve the data.<br />
