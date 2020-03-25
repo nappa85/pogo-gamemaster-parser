@@ -234,7 +234,7 @@ struct Moveset<'a> {
 impl<'a> Moveset<'a>{
     fn from(p: &'a entities::PokemonSettings, combat_moves: &'a HashMap<&'a str, &'a entities::CombatMove>, player_level: &entities::PlayerLevel) -> Vec<Self> {
         let mut res = Vec::new();
-        match (Self::convert_moves(&p.quick_moves, LEGACY_QUICK_MOVES.get(&p.pokemon_id), combat_moves), Self::convert_moves(&p.cinematic_moves, LEGACY_CHARGED_MOVES.get(&p.pokemon_id), combat_moves)) {
+        match (Self::convert_moves(&p.quick_moves, LEGACY_QUICK_MOVES.get(&p.unique_id), combat_moves), Self::convert_moves(&p.cinematic_moves, LEGACY_CHARGED_MOVES.get(&p.unique_id), combat_moves)) {
             (Some(fast), Some(charged)) => {
                 let levels = Self::get_max_level(&p.stats, player_level);
                 for fast_move in &fast {
@@ -333,7 +333,7 @@ impl<'a> Moveset<'a>{
     // get the total amount of damage given by the fast moves neede to lauch  a charged move, and the charged move itself
     fn get_dpc(pokemon: &entities::PokemonSettings, fast_move: &entities::CombatMove, charged_move: &entities::CombatMove, level: u8, atk: u8, player_level: &entities::PlayerLevel) -> Option<f64> {
         match (charged_move.energy_delta, fast_move.energy_delta) {
-            (Some(c), Some(f)) => Some((((c * -1) as f64)  / (f as f64)).ceil() * (fast_move.power.unwrap_or_else(|| 0.0) as f64) * (if pokemon.r#type == fast_move.r#type || pokemon.type2.as_ref() == Some(&fast_move.r#type) { 1.2 } else { 1.0 }) + (charged_move.power.unwrap_or_else(|| 0.0) as f64) * (if pokemon.r#type == charged_move.r#type || pokemon.type2.as_ref() == Some(&charged_move.r#type) { 1.2 } else { 1.0 }) * Self::get_attack(pokemon, level, atk, player_level)),
+            (Some(c), Some(f)) => Some((((c * -1) as f64)  / (f as f64)).ceil() * (fast_move.power.unwrap_or_else(|| 0.0) as f64) * (if pokemon.type1 == fast_move.r#type || pokemon.type2.as_ref() == Some(&fast_move.r#type) { 1.2 } else { 1.0 }) + (charged_move.power.unwrap_or_else(|| 0.0) as f64) * (if pokemon.type1 == charged_move.r#type || pokemon.type2.as_ref() == Some(&charged_move.r#type) { 1.2 } else { 1.0 }) * Self::get_attack(pokemon, level, atk, player_level)),
             _ => None,
         }
     }
@@ -356,13 +356,13 @@ async fn main() -> Result<(), ()> {
         .map_err(|e| error!("Game Master decode error: {}", e))?;
 
     // load CPM
-    let player_level = root.item_templates.iter()
+    let player_level = root.item_template.iter()
         .find(|item| item.player_level.is_some())
         .map(|item| item.player_level.as_ref().unwrap())
         .unwrap();
 
     // create PVP moves dictionary
-    let combat_moves: HashMap<&str, &entities::CombatMove> = root.item_templates.iter()
+    let combat_moves: HashMap<&str, &entities::CombatMove> = root.item_template.iter()
         .filter(|item| item.combat_move.is_some())
         .map(|item| {
             let combat_move = item.combat_move.as_ref().unwrap();
@@ -371,11 +371,11 @@ async fn main() -> Result<(), ()> {
         .collect();
 
     // create Pokémon-Form dictionary
-    let pokemon: HashMap<&str, HashMap<Option<&str>, &entities::PokemonSettings>> = root.item_templates.iter()
-        .filter(|item| item.pokemon_settings.is_some())
+    let pokemon: HashMap<&str, HashMap<Option<&str>, &entities::PokemonSettings>> = root.item_template.iter()
+        .filter(|item| item.pokemon.is_some())
         .fold(HashMap::new(), |mut dict, item| {
-            let pokemon = item.pokemon_settings.as_ref().unwrap();
-            let sub_dict = dict.entry(pokemon.pokemon_id.as_str()).or_insert_with(HashMap::new);
+            let pokemon = item.pokemon.as_ref().unwrap();
+            let sub_dict = dict.entry(pokemon.unique_id.as_str()).or_insert_with(HashMap::new);
             sub_dict.insert(pokemon.form.as_ref().map(|s| s.as_str()), pokemon);
             dict
         });
@@ -386,12 +386,12 @@ async fn main() -> Result<(), ()> {
         .map(|(_, forms)| {
             let base_form = forms.get(&None);
             let base_stats = base_form.map(|p| p.stats);
-            let base_type = base_form.map(|p| (p.r#type.clone(), p.type2.clone()));
+            let base_type = base_form.map(|p| (p.type1.clone(), p.type2.clone()));
 
             forms.into_iter()
                 .filter(move |(_, p)| {
                     p.form.is_none() ||
-                    Some((&p.r#type, p.type2.as_ref())) != base_type.as_ref().map(|(t1, t2)| (t1, t2.as_ref())) ||
+                    Some((&p.type1, p.type2.as_ref())) != base_type.as_ref().map(|(t1, t2)| (t1, t2.as_ref())) ||
                     Some(&p.stats) != base_stats.as_ref()
                 })
                 .map(|(_, p)| p)
@@ -408,13 +408,13 @@ async fn main() -> Result<(), ()> {
         }
 
         let movesets = mvs.into_iter().map(|mv| json!({
-            "pokemon_id": mv.pokemon.pokemon_id.as_str(),
-            "pokemon_type1": mv.pokemon.r#type.replacen("POKEMON_TYPE_", "", 1),
+            "pokemon_id": mv.pokemon.unique_id.as_str(),
+            "pokemon_type1": mv.pokemon.type1.replacen("POKEMON_TYPE_", "", 1),
             "pokemon_type2": mv.pokemon.type2.as_ref().map(|s| s.replacen("POKEMON_TYPE_", "", 1)),
             "base_atk": mv.pokemon.stats.base_attack,
             "base_def": mv.pokemon.stats.base_defense,
             "base_sta": mv.pokemon.stats.base_stamina,
-            "form": mv.pokemon.form.as_ref().map(|s| s.replacen(&format!("{}_", mv.pokemon.pokemon_id), "", 1)),
+            "form": mv.pokemon.form.as_ref().map(|s| s.replacen(&format!("{}_", mv.pokemon.unique_id), "", 1)),
             "cp": mv.cp,
             "level": mv.level,
             "atk": mv.atk,
