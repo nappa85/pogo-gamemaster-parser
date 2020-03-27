@@ -1,7 +1,7 @@
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Root {
     #[serde(rename = "itemTemplate")]
@@ -10,7 +10,7 @@ pub struct Root {
     pub timestamp_ms: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 // #[serde(deny_unknown_fields)]//minimalistic approach
 pub struct Template {
     #[serde(rename = "templateId")]
@@ -22,7 +22,7 @@ pub struct Template {
     pub pokemon: Option<PokemonSettings>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CombatMove {
     #[serde(rename = "uniqueId")]
@@ -38,7 +38,7 @@ pub struct CombatMove {
     pub buffs: Option<Buffs>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Buffs {
     #[serde(rename = "attackerAttackStatStageChange")]
@@ -53,7 +53,7 @@ pub struct Buffs {
     pub buff_activation_chance: f32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PlayerLevel {
     #[serde(rename = "rankNum")]
@@ -70,7 +70,7 @@ pub struct PlayerLevel {
     pub max_quest_encounter_player_level: u8,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PokemonSettings {
     #[serde(rename = "uniqueId")]
@@ -147,7 +147,7 @@ pub struct PokemonSettings {
     pub buddy_group_number: u8,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CameraSetting {
     #[serde(rename = "diskRadiusM")]
@@ -162,7 +162,7 @@ pub struct CameraSetting {
     pub shoulder_mode_scale: Option<f32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Encounter {
     #[serde(rename = "baseCaptureRate")]
@@ -203,7 +203,7 @@ pub struct Encounter {
     pub max_pokemon_action_frequency_s: f32,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Copy, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Copy, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Stats {
     #[serde(rename = "baseStamina")]
@@ -214,7 +214,7 @@ pub struct Stats {
     pub base_defense: u16,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvolutionBranch {
     pub evolution: Option<String>,
@@ -240,7 +240,7 @@ pub struct EvolutionBranch {
     pub gender_requirement: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ThirdMove {
     #[serde(rename = "stardustToUnlock")]
@@ -249,7 +249,7 @@ pub struct ThirdMove {
     pub candy_to_unlock: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Shadow {
     #[serde(rename = "purificationStardustNeeded")]
