@@ -5,24 +5,16 @@
 //!
 //! Pokémon GO GameMaster parser
 
-use std::path::Path;
-
 mod entities;
-mod export;
 mod import;
-
-// const MEGA_LEAGUE: RangeInclusive<u32> = 1400..=1500;
-// const ULTRA_LEAGUE: RangeInclusive<u32> = 2400..=2500;
-
-// static TARGET: Lazy<String> = Lazy::new(|| env::var("TARGET").expect("Missing TARGET env var"));
+mod moveset;
+mod combat;
 
 #[tokio::main]
 async fn main() -> Result<(), ()> {
     env_logger::init();
 
-    let folder = Path::new("./matches/");
-    export::exec(&folder).await?;
-    import::exec(&folder).await?;
+    import::exec().await?;
 
     // let mut res: Vec<(String, usize)> = matches.par_bridge()
     //     .fold_with(HashMap::new(), |mut dict, (team1, team2)| {

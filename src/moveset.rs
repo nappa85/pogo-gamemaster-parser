@@ -1,22 +1,11 @@
 use std::ops::RangeInclusive;
 use std::collections::HashMap;
-use std::path::Path;
-
-use serde::Serialize;
 
 use itertools::Itertools;
 
-use futures_util::stream::{iter, StreamExt};
-
-use tokio::{fs::{File, create_dir}, io::AsyncWriteExt};
-
 use once_cell::sync::Lazy;
 
-use log::{info, error};
-
-use crate::entities::{Root, PokemonSettings, CombatMove, Stats, PlayerLevel};
-
-const MEGA_LEAGUE: RangeInclusive<u32> = 1400..=1500;
+use crate::entities::{PokemonSettings, CombatMove, Stats, PlayerLevel};
 
 static LEGACY_QUICK_MOVES: Lazy<HashMap<String, Vec<&'static str>>> = Lazy::new(|| {
     let mut res = HashMap::new();
@@ -206,31 +195,25 @@ static LEGACY_CHARGED_MOVES: Lazy<HashMap<String, Vec<&'static str>>> = Lazy::ne
 });
 
 // intermediate struct
-#[derive(Debug, Clone, Serialize)]
-struct Moveset<'a> {
-    // pokemon: &'a PokemonSettings,
-    unique_id: &'a str,
-    type1: &'a str,
-    type2: Option<&'a str>,
-    base_attack: u16,
-    base_defense: u16,
-    // 
-    cp: u32,
-    level: u8,
-    atk: u8,
-    def: u8,
-    sta: u8,
-    cpm: f64,
-    fast_move: &'a CombatMove,
-    fast_legacy: Option<bool>,
-    charged_move1: &'a CombatMove,
-    charged_legacy1: Option<bool>,
-    charged_move2: &'a CombatMove,
-    charged_legacy2: Option<bool>,
+#[derive(Debug, Clone)]
+pub struct Moveset<'a> {
+    pub pokemon: &'a PokemonSettings,
+    pub cp: u32,
+    pub level: u8,
+    pub atk: u8,
+    pub def: u8,
+    pub sta: u8,
+    pub cpm: f64,
+    pub fast_move: &'a CombatMove,
+    pub fast_legacy: Option<bool>,
+    pub charged_move1: &'a CombatMove,
+    pub charged_legacy1: Option<bool>,
+    pub charged_move2: &'a CombatMove,
+    pub charged_legacy2: Option<bool>,
 }
 
 impl<'a> Moveset<'a>{
-    fn from(p: &'a PokemonSettings, combat_moves: &'a HashMap<&'a str, &'a CombatMove>, max_cp: Option<&RangeInclusive<u32>>, player_level: &PlayerLevel) -> Vec<Self> {
+    pub fn from(p: &'a PokemonSettings, combat_moves: &'a HashMap<&'a str, &'a CombatMove>, max_cp: Option<&RangeInclusive<u32>>, player_level: &PlayerLevel) -> Vec<Self> {
         let mut res = Vec::new();
         match (Self::convert_moves(&p.quick_moves, LEGACY_QUICK_MOVES.get(&p.unique_id), combat_moves), Self::convert_moves(&p.cinematic_moves, LEGACY_CHARGED_MOVES.get(&p.unique_id), combat_moves)) {
             (Some(fast), Some(charged)) => {
@@ -238,12 +221,7 @@ impl<'a> Moveset<'a>{
                     for charged_moves in charged.into_iter().combinations(2) {
                         for fast_move in &fast {
                             res.push(Moveset {
-                                // pokemon: p,
-                                unique_id: &p.unique_id,
-                                type1: &p.type1,
-                                type2: p.type2.as_ref().map(|s| s.as_str()),
-                                base_attack: p.stats.base_attack,
-                                base_defense: p.stats.base_defense,
+                                pokemon: p,
                                 cp: cp,
                                 level: level,
                                 atk: atk,
@@ -295,7 +273,7 @@ impl<'a> Moveset<'a>{
                     for atk in (0_u8..=15_u8).rev() {
                         let cp = Self::get_cp(stats, level, atk, def, sta, player_level);
                         if let Some(mcp) = max_cp {
-                            if mcp.contains(&cp) {
+                            if !mcp.contains(&cp) {
                                 continue;
                             }
                         }
@@ -313,115 +291,4 @@ impl<'a> Moveset<'a>{
     fn get_cp(stats: &Stats, level: u8, atk: u8, def: u8, sta: u8, player_level: &PlayerLevel) -> u32 {
         ((((stats.base_attack + (atk as u16)) as f64) * ((stats.base_defense + (def as u16)) as f64).powf(0.5) * ((stats.base_stamina + (sta as u16)) as f64).powf(0.5) * player_level.cp_multiplier[(level - 1) as usize].powi(2)) / 10_f64).floor() as u32
     }
-
-    // // how many turns of fast move are needed to launch a charged move
-    // fn get_tpc(fast_move: &entities::CombatMove, charged_move: &entities::CombatMove) -> Option<u8> {
-    //     match (charged_move.energy_delta, fast_move.energy_delta) {
-    //         (Some(c), Some(f)) => Some(((((c * -1) as f64)  / (f as f64)).ceil() as u8) * (fast_move.duration_turns.unwrap_or_else(|| 0) + 1)),
-    //         _ => None,
-    //     }
-    // }
-
-    // // get the total amount of damage given by the fast moves neede to lauch  a charged move, and the charged move itself
-    // fn get_dpc(pokemon: &entities::PokemonSettings, fast_move: &entities::CombatMove, charged_move: &entities::CombatMove, level: u8, atk: u8, player_level: &entities::PlayerLevel) -> Option<f64> {
-    //     match (charged_move.energy_delta, fast_move.energy_delta) {
-    //         (Some(c), Some(f)) => Some((((c * -1) as f64)  / (f as f64)).ceil() * (fast_move.power.unwrap_or_else(|| 0.0) as f64) * (if pokemon.type1 == fast_move.r#type || pokemon.type2.as_ref() == Some(&fast_move.r#type) { 1.2 } else { 1.0 }) + (charged_move.power.unwrap_or_else(|| 0.0) as f64) * (if pokemon.type1 == charged_move.r#type || pokemon.type2.as_ref() == Some(&charged_move.r#type) { 1.2 } else { 1.0 }) * Self::get_attack(pokemon, level, atk, player_level)),
-    //         _ => None,
-    //     }
-    // }
-
-    // fn get_attack(pokemon: &entities::PokemonSettings, level: u8, atk: u8, player_level: &entities::PlayerLevel) -> f64 {
-    //     (((pokemon.stats.base_attack + (atk as u16)) as f64) * player_level.cp_multiplier[(level - 1) as usize]).floor() + 1.0
-    // }
-}
-
-pub async fn exec(folder: &Path) -> Result<(), ()> {
-    if folder.exists() {
-        info!("Folder already exists, skipping...");
-    }
-    else {
-        info!("Matches folder not found, creating...");
-
-        // load game master
-        let root: Root = reqwest::get("https://raw.githubusercontent.com/pokemongo-dev-contrib/pokemongo-game-master/master/versions/latest/GAME_MASTER.json")
-            .await
-            .map_err(|e| error!("Game Master retrieve error: {}", e))?
-            .json()
-            .await
-            .map_err(|e| error!("Game Master decode error: {}", e))?;
-
-        // load CPM
-        let player_level = root.item_template.iter()
-            .find(|item| item.player_level.is_some())
-            .map(|item| item.player_level.as_ref().unwrap())
-            .unwrap();
-
-        // create PVP moves dictionary
-        let combat_moves: HashMap<&str, &CombatMove> = root.item_template.iter()
-            .filter(|item| item.combat_move.is_some())
-            .map(|item| {
-                let combat_move = item.combat_move.as_ref().unwrap();
-                (combat_move.unique_id.as_str(), combat_move)
-            })
-            .collect();
-
-        // create Pokémon-Form dictionary
-        let pokemon: HashMap<&str, HashMap<Option<&str>, &PokemonSettings>> = root.item_template.iter()
-            .filter(|item| item.pokemon.is_some())
-            .fold(HashMap::new(), |mut dict, item| {
-                let pokemon = item.pokemon.as_ref().unwrap();
-                let sub_dict = dict.entry(pokemon.unique_id.as_str()).or_insert_with(HashMap::new);
-                sub_dict.insert(pokemon.form.as_ref().map(|s| s.as_str()), pokemon);
-                dict
-            });
-        
-        // create Pokémon-Moveset dictionary
-        let movesets = pokemon.into_iter()
-            // try to cleanup duplication given by forms
-            .map(|(_, forms)| {
-                let base_form = forms.get(&None);
-                let base_stats = base_form.map(|p| p.stats);
-                let base_type = base_form.map(|p| (p.type1.clone(), p.type2.clone()));
-
-                forms.into_iter()
-                    .filter(move |(_, p)| {
-                        p.form.is_none() ||
-                        Some((&p.type1, p.type2.as_ref())) != base_type.as_ref().map(|(t1, t2)| (t1, t2.as_ref())) ||
-                        Some(&p.stats) != base_stats.as_ref()
-                    })
-                    .map(|(_, p)| p)
-            })
-            .flatten()
-            .map(|p| Moveset::from(p, &combat_moves, Some(&MEGA_LEAGUE), &player_level))
-            .flatten();
-
-        let matches = movesets.permutations(3)
-            // you can't have the same pokemon in the team, despite the form
-            .filter(|m| {
-                // m[0].pokemon.unique_id != m[1].pokemon.unique_id &&
-                //     m[0].pokemon.unique_id != m[2].pokemon.unique_id &&
-                //     m[1].pokemon.unique_id != m[2].pokemon.unique_id
-                m[0].unique_id != m[1].unique_id &&
-                    m[0].unique_id != m[2].unique_id &&
-                    m[1].unique_id != m[2].unique_id
-            })
-            // create every possible match
-            .combinations(2)
-            .enumerate();
-
-        create_dir(folder).await.map_err(|e| error!("Can't create matches folder: {}", e))?;
-        iter(matches).for_each_concurrent(Some(10), |(index, pvp)| async move {
-            let mut filename = folder.to_path_buf();
-            filename.push(index.to_string());
-            if let Ok(mut file) = File::create(&filename).await.map_err(|e| error!("Can't create file {}: {}", filename.display(), e)) {
-                if let Ok(contents) = bincode::serialize(&pvp).map_err(|e| error!("Can't convert match to json: {}", e)) {
-                    file.write_all(&contents).await.map_err(|e| error!("Can't write file {}: {}", filename.display(), e)).ok();
-                }
-            }
-        }).await;
-
-        info!("Folder created!");*/
-    }
-
-    Ok(())
 }
