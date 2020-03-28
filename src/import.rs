@@ -70,32 +70,6 @@ pub async fn exec() -> Result<(), ()> {
         .enumerate()
         .collect();
 
-    // let matches = movesets.permutations(3)
-    //     // you can't have the same pokemon in the team, despite the form
-    //     .filter(|m| {
-    //         // m[0].pokemon.unique_id != m[1].pokemon.unique_id &&
-    //         //     m[0].pokemon.unique_id != m[2].pokemon.unique_id &&
-    //         //     m[1].pokemon.unique_id != m[2].pokemon.unique_id
-    //         m[0].unique_id != m[1].unique_id &&
-    //             m[0].unique_id != m[2].unique_id &&
-    //             m[1].unique_id != m[2].unique_id
-    //     })
-    //     // create every possible match
-    //     .combinations(2)
-    //     .enumerate();
-
-    // create_dir(folder).await.map_err(|e| error!("Can't create matches folder: {}", e))?;
-    // iter(matches).for_each_concurrent(Some(10), |(index, pvp)| async move {
-    //     let mut filename = folder.to_path_buf();
-    //     filename.push(index.to_string());
-    //     if let Ok(mut file) = File::create(&filename).await.map_err(|e| error!("Can't create file {}: {}", filename.display(), e)) {
-    //         if let Ok(contents) = bincode::serialize(&pvp).map_err(|e| error!("Can't convert match to json: {}", e)) {
-    //             file.write_all(&contents).await.map_err(|e| error!("Can't write file {}: {}", filename.display(), e)).ok();
-    //         }
-    //     }
-    // }).await;
-
-    // info!("Folder created!");
     let matches = movesets.iter()
         .combinations(2)
         .par_bridge()

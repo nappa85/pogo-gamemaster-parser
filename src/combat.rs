@@ -368,27 +368,32 @@ fn _get_damage(m: &CombatMove, atk: &Moveset, def: &Moveset) -> i32 {
         multipliers).floor() as i32) + 1
 }
 
-fn get_damage(p1: &Moveset, energy: &mut i32, wait: &mut i32, p2: &Moveset) -> i32 {
+enum DamageType {
+    Fast(i32),
+    Charged(i32),
+}
+
+fn get_damage(p1: &Moveset, energy: &mut i32, wait: &mut i32, p2: &Moveset) -> DamageType {
     let charged1_damage = _get_damage(&p1.charged_move1, p1, p2);
     let charged2_damage = _get_damage(&p1.charged_move2, p1, p2);
     if charged1_damage > charged2_damage {
         let energy_delta = p1.charged_move1.energy_delta.unwrap_or_else(|| 0) as i32;
         if *energy + energy_delta > 0 {
             *energy += energy_delta;
-            return charged1_damage;
+            return DamageType::Charged(charged1_damage);
         }
     }
     else {
         let energy_delta = p2.charged_move1.energy_delta.unwrap_or_else(|| 0) as i32;
         if *energy + energy_delta > 0 {
             *energy += energy_delta;
-            return charged2_damage;
+            return DamageType::Charged(charged2_damage);
         }
     }
 
     *energy += p1.fast_move.energy_delta.unwrap_or_else(|| 0) as i32;
     *wait = p1.fast_move.duration_turns.unwrap_or_else(|| 0) as i32;
-    _get_damage(&p1.fast_move, p1, p2)
+    DamageType::Fast(_get_damage(&p1.fast_move, p1, p2))
 }
 
 pub enum CombatResult {
@@ -402,22 +407,72 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
     let mut team1_cp = team1[0].cp as i32;
     let mut team1_wait = 0;
     let mut team1_energy = 0;
+    let mut team1_damage;
     let mut team2_pokemon = 0;
     let mut team2_cp = team2[0].cp as i32;
     let mut team2_wait = 0;
     let mut team2_energy = 0;
+    let mut team2_damage;
     loop {
         if team1_wait > 0 {
             team1_wait -= 1;
+            team1_damage = None;
         }
         else {
-            team2_cp -= get_damage(&team1[team1_pokemon], &mut team1_energy, &mut team1_wait, &team2[team2_pokemon]);
+            team1_damage = Some(get_damage(&team1[team1_pokemon], &mut team1_energy, &mut team1_wait, &team2[team2_pokemon]));
         }
         if team2_wait > 0 {
             team2_wait -= 1;
+            team2_damage = None;
         }
         else {
-            team1_cp -= get_damage(&team2[team2_pokemon], &mut team2_energy, &mut team2_wait, &team1[team1_pokemon]);
+            team2_damage = Some(get_damage(&team2[team2_pokemon], &mut team2_energy, &mut team2_wait, &team1[team1_pokemon]));
+        }
+
+        match (team1_damage, team2_damage) {
+            (Some(DamageType::Charged(d1)), Some(DamageType::Charged(d2))) => {
+                if team1[team1_pokemon].pokemon.stats.base_attack + (team1[team1_pokemon].atk as u16) >= team2[team2_pokemon].pokemon.stats.base_attack + (team2[team2_pokemon].atk as u16) {
+                    team2_cp -= d1;
+                    if team2_cp > 0 {
+                        team1_cp -= d2;
+                    }
+                }
+                else {
+                    team1_cp -= d2;
+                    if team1_cp > 0 {
+                        team2_cp -= d1;
+                    }
+                }
+            },
+            (Some(DamageType::Charged(d1)), Some(DamageType::Fast(d2))) => {
+                team2_cp -= d1;
+                if team2_cp > 0 {
+                    team1_cp -= d2;
+                }
+            },
+            (Some(DamageType::Fast(d1)), Some(DamageType::Charged(d2))) => {
+                team1_cp -= d2;
+                if team1_cp > 0 {
+                    team2_cp -= d1;
+                }
+            },
+            (Some(DamageType::Fast(d1)), Some(DamageType::Fast(d2))) => {
+                team1_cp -= d2;
+                team2_cp -= d1;
+            },
+            (Some(DamageType::Fast(d1)), None) => {
+                team2_cp -= d1;
+            },
+            (Some(DamageType::Charged(d1)), None) => {
+                team2_cp -= d1;
+            },
+            (None, Some(DamageType::Fast(d2))) => {
+                team1_cp -= d2;
+            },
+            (None, Some(DamageType::Charged(d2))) => {
+                team1_cp -= d2;
+            },
+            (None, None) => {},
         }
 
         if team1_cp <= 0 {
