@@ -248,12 +248,18 @@ impl<'a> Moveset<'a>{
         let mut res = Vec::new();
         if let Some(moves) = m.as_ref() {
             for name in moves {
-                res.push(combat_moves[&name.as_str()]);
+                let temp = combat_moves[&name.as_str()];
+                if temp.power.is_some() {
+                    res.push(temp);
+                }
             }
         }
         if let Some(moves) = legacy_moves {
             for name in moves {
-                res.push(combat_moves[name]);
+                let temp = combat_moves[name];
+                if temp.power.is_some() {
+                    res.push(temp);
+                }
             }
         }
         if res.is_empty() {

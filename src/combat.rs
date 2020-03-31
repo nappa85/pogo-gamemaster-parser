@@ -402,6 +402,7 @@ pub enum CombatResult {
     Second,
 }
 
+#[allow(dead_code)]
 pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) -> CombatResult {
     let mut team1_pokemon = 0;
     let mut team1_cp = team1[0].cp as i32;

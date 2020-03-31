@@ -1,8 +1,6 @@
 use std::ops::RangeInclusive;
 use std::collections::HashMap;
 
-use itertools::Itertools;
-
 use rayon::{iter::{ParallelBridge, ParallelIterator}, slice::ParallelSliceMut};
 
 use log::error;
@@ -70,13 +68,34 @@ pub async fn exec() -> Result<(), ()> {
         .enumerate()
         .collect();
 
-    let matches = movesets.iter()
-        .combinations(2)
+    println!("{} movesets", movesets.len());
+
+    let teams = movesets.iter()
         .par_bridge()
-        .fold(HashMap::new, |mut dict, teams| {
-            let entry = match combat(&[&teams[0].1], &[&teams[1].1]) {
-                CombatResult::First => dict.entry(*teams[0].0).or_insert_with(|| 0),
-                CombatResult::Second => dict.entry(*teams[1].0).or_insert_with(|| 0),
+        .map_with(&movesets, |ms, m1| ms.iter().par_bridge().map(move |m2| (m1, m2)))
+        .flatten()
+        .map_with(&movesets, |ms, (m1, m2)| ms.iter().par_bridge().map(move |m3| (m1, m2, m3)))
+        .flatten()
+        .filter(|(t0, t1, t2)| {
+            // unique pokemon
+            t0.1.pokemon.unique_id != t1.1.pokemon.unique_id &&
+                t0.1.pokemon.unique_id != t2.1.pokemon.unique_id &&
+                t1.1.pokemon.unique_id != t2.1.pokemon.unique_id &&
+            // additional filter: unique types
+                t0.1.pokemon.type1 != t1.1.pokemon.type1 &&
+                Some(&t0.1.pokemon.type1) != t1.1.pokemon.type2.as_ref() &&
+                t0.1.pokemon.type1 != t2.1.pokemon.type1 &&
+                Some(&t0.1.pokemon.type1) != t2.1.pokemon.type2.as_ref() &&
+                t1.1.pokemon.type1 != t2.1.pokemon.type1 &&
+                Some(&t1.1.pokemon.type1) != t2.1.pokemon.type2.as_ref()
+        });
+
+    let matches = teams.clone().map_with(teams, |ts, t1| ts.clone().map(move |t2| (t1, t2)))
+        .flatten()
+        .fold(HashMap::new, |mut dict, ((t0_0, t0_1, t0_2), (t1_0, t1_1, t1_2))| {
+            let entry = match combat(&[t0_0.1, t0_1.1, t0_2.1], &[t1_0.1, t1_1.1, t1_2.1]) {
+                CombatResult::First => dict.entry((*t0_0.0, *t0_1.0, *t0_2.0)).or_insert_with(|| 0),
+                CombatResult::Second => dict.entry((*t1_0.0, *t1_1.0, *t1_2.0)).or_insert_with(|| 0),
                 _ => return dict,
             };
             *entry += 1;
@@ -90,22 +109,28 @@ pub async fn exec() -> Result<(), ()> {
             dict
         });
 
-    let mut results: Vec<(Moveset, usize)> = movesets.into_iter()
-        .map(|(index, moveset)| {
-            (moveset, matches.get(&index).cloned().unwrap_or_else(|| 0))
-        })
-        .collect();
+    let mut results: Vec<((usize, usize, usize), usize)> = matches.into_iter().collect();
 
     results.par_sort_unstable_by(|(_, a), (_, b)| a.cmp(b));
 
-    for result in &results {
-        println!("{} => {} {} {} {} {}",
-            result.1,
-            result.0.pokemon.unique_id,
-            result.0.pokemon.form.as_ref().map(|s| s.as_str()).unwrap_or_else(|| ""),
-            result.0.fast_move.unique_id,
-            result.0.charged_move1.unique_id,
-            result.0.charged_move2.unique_id
+    for ((m0, m1, m2), score) in &results {
+        println!("{} => {{\n {} {} {} {} {}\n {} {} {} {} {}\n {} {} {} {} {}\n}}",
+            score,
+            movesets[m0].pokemon.unique_id,
+            movesets[m0].pokemon.form.as_ref().map(|s| s.as_str()).unwrap_or_else(|| ""),
+            movesets[m0].fast_move.unique_id,
+            movesets[m0].charged_move1.unique_id,
+            movesets[m0].charged_move2.unique_id,
+            movesets[m1].pokemon.unique_id,
+            movesets[m1].pokemon.form.as_ref().map(|s| s.as_str()).unwrap_or_else(|| ""),
+            movesets[m1].fast_move.unique_id,
+            movesets[m1].charged_move1.unique_id,
+            movesets[m1].charged_move2.unique_id,
+            movesets[m2].pokemon.unique_id,
+            movesets[m2].pokemon.form.as_ref().map(|s| s.as_str()).unwrap_or_else(|| ""),
+            movesets[m2].fast_move.unique_id,
+            movesets[m2].charged_move1.unique_id,
+            movesets[m2].charged_move2.unique_id
         );
     }
 
