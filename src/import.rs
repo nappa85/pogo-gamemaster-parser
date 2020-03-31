@@ -94,12 +94,23 @@ pub async fn exec() -> Result<(), ()> {
         .flatten()
         .fold(HashMap::new, |mut dict, ((t0_0, t0_1, t0_2), (t1_0, t1_1, t1_2))| {
             let entry = match combat(&[t0_0.1, t0_1.1, t0_2.1], &[t1_0.1, t1_1.1, t1_2.1]) {
-                CombatResult::First => dict.entry((*t0_0.0, *t0_1.0, *t0_2.0)).or_insert_with(|| 0),
-                CombatResult::Second => dict.entry((*t1_0.0, *t1_1.0, *t1_2.0)).or_insert_with(|| 0),
+                CombatResult::First => dict.entry(*t0_0.0).or_insert_with(HashMap::new).entry(*t0_1.0).or_insert_with(HashMap::new).entry(*t0_2.0).or_insert_with(|| 0),
+                CombatResult::Second => dict.entry(*t1_0.0).or_insert_with(HashMap::new).entry(*t1_1.0).or_insert_with(HashMap::new).entry(*t1_2.0).or_insert_with(|| 0),
                 _ => return dict,
             };
             *entry += 1;
             dict
+        })
+        .map(|fold| {
+            let mut res = HashMap::new();
+            for (index, value) in fold.into_iter().map(|(m0, hm)| hm.into_iter().map(move |(m1, hm)| hm.into_iter().map(move |(m2, v)| ((m0, m1, m2), v))).flatten()).flatten() {
+                // let's put a barrier of minumun 1001 won matches
+                if value > 1000 {
+                    let entry = res.entry(index).or_insert_with(|| 0_usize);
+                    *entry += value;
+                }
+            }
+            res
         })
         .reduce(HashMap::new, |mut dict, fold| {
             for (index, value) in fold.into_iter() {
