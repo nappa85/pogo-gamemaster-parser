@@ -5,8 +5,11 @@
 //!
 //! Pokémon GO GameMaster parser
 
-mod entities;
+use std::env;
+
+mod executor;
 mod import;
+mod entities;
 mod moveset;
 mod combat;
 
@@ -14,7 +17,9 @@ mod combat;
 async fn main() -> Result<(), ()> {
     env_logger::init();
 
-    import::exec().await?;
+    if let Some(filename) = env::args().skip(1).next() {
+        executor::exec(&filename).await?;
+    }
 
     Ok(())
 }
