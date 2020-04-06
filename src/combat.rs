@@ -327,6 +327,10 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
 
 #[cfg(test)]
 mod test {
+    use chrono::offset::Local;
+
+    use log::info;
+
     use super::{combat, CombatResult};
     use crate::entities::{PokemonSettings, CombatMove};
     use crate::moveset::Moveset;
@@ -641,5 +645,603 @@ mod test {
             charged_legacy2: None,
         };
         assert_eq!(combat(&[&m0], &[&m1]), CombatResult::Second);
+    }
+
+    #[test]
+    fn timing() {
+        env_logger::try_init().ok();
+
+        let cpm = [0.094, 0.16639787, 0.21573247, 0.25572005, 0.29024988, 0.3210876, 0.34921268, 0.3752356, 0.39956728, 0.4225, 0.44310755, 0.4627984, 0.48168495, 0.49985844, 0.51739395, 0.5343543, 0.5507927, 0.5667545, 0.5822789, 0.5974, 0.6121573, 0.6265671, 0.64065295, 0.65443563, 0.667934, 0.6811649, 0.69414365, 0.7068842, 0.7193991, 0.7317, 0.7377695, 0.74378943, 0.74976104, 0.7556855, 0.76156384, 0.76739717, 0.7731865, 0.77893275, 0.784637, 0.7903, 0.7953, 0.8003, 0.8053, 0.8103, 0.8153];
+        let giratina: PokemonSettings = serde_json::from_str(r#"{
+            "uniqueId": "GIRATINA",
+            "modelScale": 1.26,
+            "type1": "POKEMON_TYPE_GHOST",
+            "type2": "POKEMON_TYPE_DRAGON",
+            "camera": {
+              "diskRadiusM": 0.378,
+              "cylinderRadiusM": 1.5,
+              "cylinderHeightM": 4.0,
+              "shoulderModeScale": 0.5
+            },
+            "encounter": {
+              "baseCaptureRate": 0.02,
+              "baseFleeRate": 0.04,
+              "collisionRadiusM": 1.0,
+              "collisionHeightM": 0.252,
+              "collisionHeadRadiusM": 0.5,
+              "movementType": "MOVEMENT_JUMP",
+              "movementTimerS": 10.0,
+              "jumpTimeS": 0.9,
+              "attackTimerS": 29.0,
+              "attackProbability": 0.2,
+              "dodgeProbability": 0.05,
+              "dodgeDurationS": 1.0,
+              "dodgeDistance": 1.0,
+              "cameraDistance": 6.0,
+              "minPokemonActionFrequencyS": 0.2,
+              "maxPokemonActionFrequencyS": 1.6
+            },
+            "stats": {
+              "baseStamina": 284,
+              "baseAttack": 187,
+              "baseDefense": 225
+            },
+            "quickMoves": ["DRAGON_BREATH_FAST", "SHADOW_CLAW_FAST"],
+            "cinematicMoves": ["DRAGON_CLAW", "ANCIENT_POWER", "SHADOW_SNEAK"],
+            "animTime": [1.9, 0.6667, 1.8, 1.7667, 0.0, 2.4, 0.8667, 0.0],
+            "evolutionPips": 1,
+            "pokemonClass": "POKEMON_CLASS_LEGENDARY",
+            "pokedexHeightM": 4.5,
+            "pokedexWeightKg": 750.0,
+            "heightStdDev": 0.5625,
+            "weightStdDev": 93.75,
+            "familyId": "FAMILY_GIRATINA",
+            "candyToEvolve": 25,
+            "kmBuddyDistance": 20.0,
+            "buddySize": "BUDDY_BIG",
+            "modelHeight": 5.38,
+            "modelScaleV2": 0.63,
+            "form": "GIRATINA_ALTERED",
+            "buddyOffsetMale": [25.5, 0.0, 1.25],
+            "buddyOffsetFemale": [25.5, 0.0, 1.25],
+            "buddyScale": 19.0,
+            "buddyPortraitOffset": [0.33, 0.21, 0.84],
+            "thirdMove": {
+              "stardustToUnlock": 100000,
+              "candyToUnlock": 100
+            },
+            "isTransferable": true,
+            "buddyGroupNumber": 3
+        }"#).unwrap();
+        let togekiss: PokemonSettings = serde_json::from_str(r#"{
+            "uniqueId": "TOGEKISS",
+            "modelScale": 1.26,
+            "type1": "POKEMON_TYPE_FAIRY",
+            "type2": "POKEMON_TYPE_FLYING",
+            "camera": {
+              "diskRadiusM": 0.378,
+              "cylinderRadiusM": 0.5,
+              "cylinderHeightM": 0.9,
+              "cylinderGroundM": 0.5,
+              "shoulderModeScale": 0.5
+            },
+            "encounter": {
+              "baseCaptureRate": 0.01,
+              "baseFleeRate": 0.05,
+              "collisionRadiusM": 0.35,
+              "collisionHeightM": 0.252,
+              "collisionHeadRadiusM": 0.4,
+              "movementType": "MOVEMENT_FLYING",
+              "movementTimerS": 10.0,
+              "jumpTimeS": 0.9,
+              "attackTimerS": 29.0,
+              "bonusCandyCaptureReward": 7,
+              "bonusStardustCaptureReward": 400,
+              "attackProbability": 0.2,
+              "dodgeProbability": 0.3,
+              "dodgeDurationS": 1.0,
+              "dodgeDistance": 1.0,
+              "cameraDistance": 5.0,
+              "minPokemonActionFrequencyS": 0.2,
+              "maxPokemonActionFrequencyS": 1.6
+            },
+            "stats": {
+              "baseStamina": 198,
+              "baseAttack": 225,
+              "baseDefense": 217
+            },
+            "quickMoves": ["AIR_SLASH_FAST", "HIDDEN_POWER_FAST", "CHARM_FAST"],
+            "cinematicMoves": ["ANCIENT_POWER", "DAZZLING_GLEAM", "AERIAL_ACE", "FLAMETHROWER"],
+            "animTime": [1.9, 0.6667, 1.8, 1.7667, 0.0, 2.4, 0.8667, 0.0],
+            "evolutionPips": 1,
+            "pokedexHeightM": 1.5,
+            "pokedexWeightKg": 38.0,
+            "parentId": "TOGETIC",
+            "heightStdDev": 0.1875,
+            "weightStdDev": 4.75,
+            "familyId": "FAMILY_TOGEPI",
+            "candyToEvolve": 25,
+            "kmBuddyDistance": 3.0,
+            "modelHeight": 1.25,
+            "modelScaleV2": 1.0,
+            "buddyOffsetMale": [-0.69, 0.0, -66.52],
+            "buddyOffsetFemale": [-0.69, 0.0, -66.52],
+            "buddyScale": 19.0,
+            "thirdMove": {
+              "stardustToUnlock": 50000,
+              "candyToUnlock": 50
+            },
+            "isTransferable": true,
+            "isDeployable": true,
+            "buddyGroupNumber": 2
+        }"#).unwrap();
+        let sceptile: PokemonSettings = serde_json::from_str(r#"{
+            "uniqueId": "SCEPTILE",
+            "modelScale": 0.8,
+            "type1": "POKEMON_TYPE_GRASS",
+            "camera": {
+            "diskRadiusM": 0.555,
+            "cylinderRadiusM": 1.0,
+            "cylinderHeightM": 1.7,
+            "shoulderModeScale": 0.5
+            },
+            "encounter": {
+            "baseCaptureRate": 0.05,
+            "baseFleeRate": 0.05,
+            "collisionRadiusM": 0.25,
+            "collisionHeightM": 0.6,
+            "collisionHeadRadiusM": 0.25,
+            "movementType": "MOVEMENT_JUMP",
+            "movementTimerS": 11.0,
+            "jumpTimeS": 1.1,
+            "attackTimerS": 20.0,
+            "bonusCandyCaptureReward": 7,
+            "bonusStardustCaptureReward": 400,
+            "attackProbability": 0.2,
+            "dodgeProbability": 0.15,
+            "dodgeDurationS": 1.0,
+            "dodgeDistance": 1.0,
+            "cameraDistance": 5.0,
+            "minPokemonActionFrequencyS": 0.2,
+            "maxPokemonActionFrequencyS": 1.6
+            },
+            "stats": {
+            "baseStamina": 172,
+            "baseAttack": 223,
+            "baseDefense": 169
+            },
+            "quickMoves": ["FURY_CUTTER_FAST", "BULLET_SEED_FAST"],
+            "cinematicMoves": ["LEAF_BLADE", "AERIAL_ACE", "EARTHQUAKE", "DRAGON_CLAW"],
+            "animTime": [1.3333, 0.6667, 1.6667, 2.0, 0.0, 2.0, 3.0, 3.0],
+            "evolutionPips": 1,
+            "pokedexHeightM": 1.7,
+            "pokedexWeightKg": 52.2,
+            "parentId": "GROVYLE",
+            "heightStdDev": 0.2125,
+            "weightStdDev": 6.525,
+            "familyId": "FAMILY_TREECKO",
+            "kmBuddyDistance": 3.0,
+            "buddySize": "BUDDY_BIG",
+            "modelHeight": 1.7,
+            "modelScaleV2": 1.0,
+            "buddyOffsetMale": [15.0, 0.0, 27.0],
+            "buddyOffsetFemale": [15.0, 0.0, 27.0],
+            "buddyScale": 19.0,
+            "thirdMove": {
+            "stardustToUnlock": 10000,
+            "candyToUnlock": 25
+            },
+            "isTransferable": true,
+            "isDeployable": true,
+            "buddyGroupNumber": 3
+        }"#).unwrap();
+        let dialga: PokemonSettings = serde_json::from_str(r#"{
+            "uniqueId": "DIALGA",
+            "modelScale": 1.26,
+            "type1": "POKEMON_TYPE_STEEL",
+            "type2": "POKEMON_TYPE_DRAGON",
+            "camera": {
+              "diskRadiusM": 0.378,
+              "cylinderRadiusM": 2.0,
+              "cylinderHeightM": 5.0,
+              "shoulderModeScale": 0.5
+            },
+            "encounter": {
+              "baseCaptureRate": 0.02,
+              "baseFleeRate": 0.04,
+              "collisionRadiusM": 0.7,
+              "collisionHeightM": 1.5,
+              "collisionHeadRadiusM": 0.4,
+              "movementType": "MOVEMENT_JUMP",
+              "movementTimerS": 10.0,
+              "jumpTimeS": 0.9,
+              "attackTimerS": 29.0,
+              "attackProbability": 0.1,
+              "dodgeProbability": 0.15,
+              "dodgeDurationS": 1.0,
+              "dodgeDistance": 1.0,
+              "cameraDistance": 6.0,
+              "minPokemonActionFrequencyS": 0.2,
+              "maxPokemonActionFrequencyS": 1.6
+            },
+            "stats": {
+              "baseStamina": 205,
+              "baseAttack": 275,
+              "baseDefense": 211
+            },
+            "quickMoves": ["DRAGON_BREATH_FAST", "METAL_CLAW_FAST"],
+            "cinematicMoves": ["DRACO_METEOR", "IRON_HEAD", "THUNDER"],
+            "animTime": [1.9, 0.6667, 1.8, 1.7667, 0.0, 2.4, 0.8667, 0.0],
+            "evolutionPips": 1,
+            "pokemonClass": "POKEMON_CLASS_LEGENDARY",
+            "pokedexHeightM": 5.4,
+            "pokedexWeightKg": 683.0,
+            "heightStdDev": 0.675,
+            "weightStdDev": 85.375,
+            "familyId": "FAMILY_DIALGA",
+            "candyToEvolve": 25,
+            "kmBuddyDistance": 20.0,
+            "buddySize": "BUDDY_BIG",
+            "modelHeight": 5.6,
+            "modelScaleV2": 0.61,
+            "buddyOffsetMale": [1.1, 0.0, -14.79],
+            "buddyOffsetFemale": [1.1, 0.0, -14.79],
+            "buddyScale": 19.0,
+            "thirdMove": {
+              "stardustToUnlock": 100000,
+              "candyToUnlock": 100
+            },
+            "isTransferable": true,
+            "buddyGroupNumber": 3
+        }"#).unwrap();
+        let articuno: PokemonSettings = serde_json::from_str(r#"{
+            "uniqueId": "ARTICUNO",
+            "modelScale": 0.66,
+            "type1": "POKEMON_TYPE_ICE",
+            "type2": "POKEMON_TYPE_FLYING",
+            "camera": {
+              "diskRadiusM": 0.594,
+              "cylinderRadiusM": 1.25,
+              "cylinderHeightM": 1.25,
+              "cylinderGroundM": 1.0,
+              "shoulderModeScale": 0.5
+            },
+            "encounter": {
+              "baseCaptureRate": 0.05,
+              "baseFleeRate": 0.1,
+              "collisionRadiusM": 0.231,
+              "collisionHeightM": 0.66,
+              "collisionHeadRadiusM": 0.231,
+              "movementType": "MOVEMENT_FLYING",
+              "movementTimerS": 3.0,
+              "jumpTimeS": 1.0,
+              "attackTimerS": 8.0,
+              "attackProbability": 0.7,
+              "dodgeProbability": 0.2,
+              "dodgeDurationS": 1.0,
+              "dodgeDistance": 1.0,
+              "cameraDistance": 3.7125,
+              "minPokemonActionFrequencyS": 0.2,
+              "maxPokemonActionFrequencyS": 1.6
+            },
+            "stats": {
+              "baseStamina": 207,
+              "baseAttack": 192,
+              "baseDefense": 236
+            },
+            "quickMoves": ["FROST_BREATH_FAST", "ICE_SHARD_FAST"],
+            "cinematicMoves": ["ICE_BEAM", "ICY_WIND", "BLIZZARD", "ANCIENT_POWER"],
+            "animTime": [2.0667, 1.0, 1.6667, 0.6667, 0.0, 2.4, 1.3333, 1.333333],
+            "evolutionPips": 1,
+            "pokemonClass": "POKEMON_CLASS_LEGENDARY",
+            "pokedexHeightM": 1.7,
+            "pokedexWeightKg": 55.4,
+            "heightStdDev": 0.2125,
+            "weightStdDev": 6.925,
+            "familyId": "FAMILY_ARTICUNO",
+            "kmBuddyDistance": 20.0,
+            "buddySize": "BUDDY_FLYING",
+            "modelHeight": 2.6,
+            "modelScaleV2": 0.91,
+            "form": "ARTICUNO_SHADOW",
+            "buddyOffsetMale": [10.0, -16.9, 28.01],
+            "buddyOffsetFemale": [10.0, -16.9, 28.01],
+            "buddyScale": 19.0,
+            "thirdMove": {
+              "stardustToUnlock": 120000,
+              "candyToUnlock": 120
+            },
+            "isTransferable": true,
+            "shadow": {
+              "purificationStardustNeeded": 20000,
+              "purificationCandyNeeded": 20,
+              "purifiedChargeMove": "RETURN",
+              "shadowChargeMove": "FRUSTRATION"
+            },
+            "buddyGroupNumber": 7
+        }"#).unwrap();
+        let swampert: PokemonSettings = serde_json::from_str(r#"{
+            "uniqueId": "SWAMPERT",
+            "modelScale": 0.78,
+            "type1": "POKEMON_TYPE_WATER",
+            "type2": "POKEMON_TYPE_GROUND",
+            "camera": {
+              "diskRadiusM": 0.555,
+              "cylinderRadiusM": 0.75,
+              "cylinderHeightM": 1.7,
+              "shoulderModeScale": 0.5
+            },
+            "encounter": {
+              "baseCaptureRate": 0.05,
+              "baseFleeRate": 0.05,
+              "collisionRadiusM": 0.4,
+              "collisionHeightM": 0.8,
+              "collisionHeadRadiusM": 0.25,
+              "movementType": "MOVEMENT_JUMP",
+              "movementTimerS": 11.0,
+              "jumpTimeS": 1.1,
+              "attackTimerS": 20.0,
+              "bonusCandyCaptureReward": 7,
+              "bonusStardustCaptureReward": 400,
+              "attackProbability": 0.2,
+              "dodgeProbability": 0.15,
+              "dodgeDurationS": 1.0,
+              "dodgeDistance": 1.0,
+              "cameraDistance": 5.0,
+              "minPokemonActionFrequencyS": 0.2,
+              "maxPokemonActionFrequencyS": 1.6
+            },
+            "stats": {
+              "baseStamina": 225,
+              "baseAttack": 208,
+              "baseDefense": 175
+            },
+            "quickMoves": ["MUD_SHOT_FAST", "WATER_GUN_FAST"],
+            "cinematicMoves": ["EARTHQUAKE", "SLUDGE_WAVE", "SURF", "MUDDY_WATER"],
+            "animTime": [1.3333, 0.6667, 1.6667, 2.0, 0.0, 2.0, 3.0, 3.0],
+            "evolutionPips": 1,
+            "pokedexHeightM": 1.5,
+            "pokedexWeightKg": 81.9,
+            "parentId": "MARSHTOMP",
+            "heightStdDev": 0.1875,
+            "weightStdDev": 10.2375,
+            "familyId": "FAMILY_MUDKIP",
+            "kmBuddyDistance": 3.0,
+            "buddySize": "BUDDY_BIG",
+            "modelHeight": 1.8,
+            "modelScaleV2": 1.0,
+            "buddyOffsetMale": [20.0, 0.0, 0.0],
+            "buddyOffsetFemale": [20.0, 0.0, 0.0],
+            "buddyScale": 19.0,
+            "thirdMove": {
+              "stardustToUnlock": 10000,
+              "candyToUnlock": 25
+            },
+            "isTransferable": true,
+            "isDeployable": true,
+            "buddyGroupNumber": 3
+        }"#).unwrap();
+        let dragon_breath: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "DRAGON_BREATH_FAST",
+            "type": "POKEMON_TYPE_DRAGON",
+            "power": 4.0,
+            "vfxName": "dragon_breath_fast",
+            "energyDelta": 3
+        }"#).unwrap();
+        let charm: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "CHARM_FAST",
+            "type": "POKEMON_TYPE_FAIRY",
+            "power": 16.0,
+            "vfxName": "charm_fast",
+            "durationTurns": 2,
+            "energyDelta": 6
+        }"#).unwrap();
+        let dragon_claw: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "DRAGON_CLAW",
+            "type": "POKEMON_TYPE_DRAGON",
+            "power": 50.0,
+            "vfxName": "dragon_claw",
+            "energyDelta": -35
+        }"#).unwrap();
+        let ancient_power: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "ANCIENT_POWER",
+            "type": "POKEMON_TYPE_ROCK",
+            "power": 45.0,
+            "vfxName": "ancient_power",
+            "energyDelta": -45,
+            "buffs": {
+                "attackerAttackStatStageChange": 2,
+                "attackerDefenseStatStageChange": 2,
+                "buffActivationChance": 0.1
+            }
+        }"#).unwrap();
+        let aerial_ace: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "AERIAL_ACE",
+            "type": "POKEMON_TYPE_FLYING",
+            "power": 55.0,
+            "vfxName": "aerial_ace",
+            "energyDelta": -45
+        }"#).unwrap();
+        let shadow_sneak: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "SHADOW_SNEAK",
+            "type": "POKEMON_TYPE_GHOST",
+            "power": 50.0,
+            "vfxName": "shadow_sneak",
+            "energyDelta": -45
+        }"#).unwrap();
+        let mud_shot: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "MUD_SHOT_FAST",
+            "type": "POKEMON_TYPE_GROUND",
+            "power": 3.0,
+            "vfxName": "mud_shot_fast",
+            "durationTurns": 1,
+            "energyDelta": 9
+        }"#).unwrap();
+        let hydro_cannon: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "HYDRO_CANNON",
+            "type": "POKEMON_TYPE_WATER",
+            "power": 80.0,
+            "vfxName": "hydro_cannon",
+            "energyDelta": -40
+        }"#).unwrap();
+        let earthquake: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "EARTHQUAKE",
+            "type": "POKEMON_TYPE_GROUND",
+            "power": 120.0,
+            "vfxName": "earthquake",
+            "energyDelta": -65
+        }"#).unwrap();
+        let ice_shard: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "ICE_SHARD_FAST",
+            "type": "POKEMON_TYPE_ICE",
+            "power": 9.0,
+            "vfxName": "ice_shard_fast",
+            "durationTurns": 2,
+            "energyDelta": 10
+        }"#).unwrap();
+        let twister: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "TWISTER",
+            "type": "POKEMON_TYPE_DRAGON",
+            "power": 45.0,
+            "vfxName": "twister",
+            "energyDelta": -45
+        }"#).unwrap();
+        let icy_wind: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "ICY_WIND",
+            "type": "POKEMON_TYPE_ICE",
+            "power": 60.0,
+            "vfxName": "icy_wind",
+            "energyDelta": -45,
+            "buffs": {
+            "targetAttackStatStageChange": -1,
+            "buffActivationChance": 1.0
+            }
+        }"#).unwrap();
+        let frenzy_plant: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "FRENZY_PLANT",
+            "type": "POKEMON_TYPE_GRASS",
+            "power": 100.0,
+            "vfxName": "frenzy_plant",
+            "energyDelta": -45
+        }"#).unwrap();
+        let fury_cutter: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "FURY_CUTTER_FAST",
+            "type": "POKEMON_TYPE_BUG",
+            "power": 2.0,
+            "vfxName": "fury_cutter_fast",
+            "energyDelta": 4
+        }"#).unwrap();
+        let draco_meteor: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "DRACO_METEOR",
+            "type": "POKEMON_TYPE_DRAGON",
+            "power": 150.0,
+            "vfxName": "draco_meteor",
+            "energyDelta": -65,
+            "buffs": {
+            "attackerAttackStatStageChange": -2,
+            "buffActivationChance": 1.0
+            }
+        }"#).unwrap();
+        let iron_head: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "IRON_HEAD",
+            "type": "POKEMON_TYPE_STEEL",
+            "power": 70.0,
+            "vfxName": "iron_head",
+            "energyDelta": -50
+        }"#).unwrap();
+        let m0 = Moveset {
+            pokemon: &giratina,
+            cp: 2491,
+            level: 26,
+            atk: 10,
+            def: 15,
+            sta: 14,
+            cpm: cpm[25],
+            fast_move: &dragon_breath,
+            fast_legacy: None,
+            charged_move1: &dragon_claw,
+            charged_legacy1: None,
+            charged_move2: &shadow_sneak,
+            charged_legacy2: None,
+        };
+        let m1 = Moveset {
+            pokemon: &swampert,
+            cp: 2472,
+            level: 29,
+            atk: 13,
+            def: 14,
+            sta: 14,
+            cpm: cpm[28],
+            fast_move: &mud_shot,
+            fast_legacy: None,
+            charged_move1: &hydro_cannon,
+            charged_legacy1: Some(true),
+            charged_move2: &earthquake,
+            charged_legacy2: None,
+        };
+        let m2 = Moveset {
+            pokemon: &articuno,
+            cp: 2495,
+            level: 27,
+            atk: 10,
+            def: 10,
+            sta: 10,
+            cpm: cpm[26],
+            fast_move: &ice_shard,
+            fast_legacy: None,
+            charged_move1: &twister,
+            charged_legacy1: Some(true),
+            charged_move2: &icy_wind,
+            charged_legacy2: None,
+        };
+        let m3 = Moveset {
+            pokemon: &togekiss,
+            cp: 2499,
+            level: 28,
+            atk: 0,
+            def: 15,
+            sta: 15,
+            cpm: cpm[27],
+            fast_move: &charm,
+            fast_legacy: None,
+            charged_move1: &aerial_ace,
+            charged_legacy1: None,
+            charged_move2: &ancient_power,
+            charged_legacy2: None,
+        };
+        let m4 = Moveset {
+            pokemon: &sceptile,
+            cp: 2499,
+            level: 28,
+            atk: 0,
+            def: 15,
+            sta: 15,
+            cpm: cpm[27],
+            fast_move: &fury_cutter,
+            fast_legacy: None,
+            charged_move1: &frenzy_plant,
+            charged_legacy1: Some(true),
+            charged_move2: &earthquake,
+            charged_legacy2: None,
+        };
+        let m5 = Moveset {
+            pokemon: &dialga,
+            cp: 2499,
+            level: 28,
+            atk: 0,
+            def: 15,
+            sta: 15,
+            cpm: cpm[27],
+            fast_move: &dragon_breath,
+            fast_legacy: None,
+            charged_move1: &draco_meteor,
+            charged_legacy1: None,
+            charged_move2: &iron_head,
+            charged_legacy2: None,
+        };
+        let start = Local::now();
+        assert_eq!(combat(&[&m0, &m1, &m2], &[&m3, &m4, &m5]), CombatResult::Second);
+        let end = Local::now();
+        info!("took {} nanoseconds", end.timestamp_nanos() - start.timestamp_nanos());
     }
 }
