@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::collections::HashMap;
 
 use tokio::{fs::File, io::AsyncReadExt};
@@ -16,11 +17,11 @@ struct Input {
     charged: Option<Vec<String>>,
 }
 
-pub async fn import<'a>(filename: &str, movesets: &'a HashMap<usize, Moveset<'a>>) -> Result<impl Iterator<Item=&'a Moveset<'a>> + Clone, ()> {
-    let mut file = File::open(filename).await.map_err(|e| error!("Error opening filter file \"{}\": {}", filename, e))?;
+pub async fn import<'a>(filename: &PathBuf, movesets: &'a HashMap<usize, Moveset<'a>>) -> Result<HashMap<usize, &'a Moveset<'a>>, ()> {
+    let mut file = File::open(filename).await.map_err(|e| error!("Error opening filter file \"{}\": {}", filename.display(), e))?;
     let mut contents = String::new();
-    file.read_to_string(&mut contents).await.map_err(|e| error!("Error reading filter file \"{}\": {}", filename, e))?;
-    let input: Vec<Input> = serde_json::from_str(&contents).map_err(|e| error!("Error decoding filter file \"{}\": {}", filename, e))?;
+    file.read_to_string(&mut contents).await.map_err(|e| error!("Error reading filter file \"{}\": {}", filename.display(), e))?;
+    let input: Vec<Input> = serde_json::from_str(&contents).map_err(|e| error!("Error decoding filter file \"{}\": {}", filename.display(), e))?;
     Ok(movesets.iter()
         .filter(move |(_, mv)| {
             input.iter().any(|i| {
@@ -30,5 +31,6 @@ pub async fn import<'a>(filename: &str, movesets: &'a HashMap<usize, Moveset<'a>
                     (i.charged.is_none() || i.charged.as_ref().map(|cms| cms.iter().any(|cm| cm == &mv.charged_move1.unique_id || cm == &mv.charged_move2.unique_id)) == Some(true))
             })
         })
-        .map(|(_, mv)| mv))
+        .map(|(i, mv)| (*i, mv))
+        .collect())
 }

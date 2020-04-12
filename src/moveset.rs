@@ -213,7 +213,7 @@ pub struct Moveset<'a> {
 }
 
 impl<'a> Moveset<'a>{
-    pub fn from(p: &'a PokemonSettings, combat_moves: &'a HashMap<&'a str, &'a CombatMove>, max_cp: Option<&RangeInclusive<u32>>, player_level: &PlayerLevel) -> Vec<Self> {
+    pub fn from(p: &'a PokemonSettings, combat_moves: &'a HashMap<&'a str, &'a CombatMove>, max_cp: Option<RangeInclusive<u32>>, player_level: &PlayerLevel) -> Vec<Self> {
         let mut res = Vec::new();
         match (Self::convert_moves(&p.quick_moves, LEGACY_QUICK_MOVES.get(&p.unique_id), combat_moves), Self::convert_moves(&p.cinematic_moves, LEGACY_CHARGED_MOVES.get(&p.unique_id), combat_moves)) {
             (Some(fast), Some(charged)) => {
@@ -271,14 +271,14 @@ impl<'a> Moveset<'a>{
     }
 
     // return maximum pokemon level for every IV combination to fit various CP caps
-    fn get_max_level(stats: &Stats, level15: bool, max_cp: Option<&RangeInclusive<u32>>, player_level: &PlayerLevel) -> Option<(u32, u8, u8, u8, u8)> {
+    fn get_max_level(stats: &Stats, level15: bool, max_cp: Option<RangeInclusive<u32>>, player_level: &PlayerLevel) -> Option<(u32, u8, u8, u8, u8)> {
         let mut res = Vec::new();
         for level in ((if level15 { 15_u8 } else { 1_u8 })..=41_u8).rev() {
             for sta in (0_u8..=15_u8).rev() {
                 for def in (0_u8..=15_u8).rev() {
                     for atk in (0_u8..=15_u8).rev() {
                         let cp = Self::get_cp(stats, level, atk, def, sta, player_level);
-                        if let Some(mcp) = max_cp {
+                        if let Some(ref mcp) = max_cp {
                             if !mcp.contains(&cp) {
                                 continue;
                             }
