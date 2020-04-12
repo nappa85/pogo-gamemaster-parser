@@ -5,7 +5,7 @@ use tokio::{fs::File, io::AsyncReadExt};
 
 use serde::Deserialize;
 
-use log::error;
+use log::{error, debug};
 
 use crate::moveset::Moveset;
 
@@ -28,9 +28,18 @@ pub async fn import<'a>(filename: &PathBuf, movesets: &'a HashMap<usize, Moveset
                 i.pokemon == mv.pokemon.unique_id &&
                     (i.form.is_none() || i.form == mv.pokemon.form) &&
                     (i.fast.is_none() || i.fast.as_ref() == Some(&mv.fast_move.unique_id)) &&
-                    (i.charged.is_none() || i.charged.as_ref().map(|cms| cms.iter().any(|cm| cm == &mv.charged_move1.unique_id || cm == &mv.charged_move2.unique_id)) == Some(true))
+                    (i.charged.is_none() || i.charged.as_ref().map(|cms| cms.contains(&mv.charged_move1.unique_id) && cms.contains(&mv.charged_move2.unique_id)) == Some(true))
             })
         })
-        .map(|(i, mv)| (*i, mv))
+        .map(|(i, mv)| {
+            debug!("filtered {} {} {} {} {}",
+                mv.pokemon.unique_id,
+                mv.pokemon.form.as_ref().map(|s| s.as_str()).unwrap_or_else(|| ""),
+                mv.fast_move.unique_id,
+                mv.charged_move1.unique_id,
+                mv.charged_move2.unique_id
+            );
+            (*i, mv)
+        })
         .collect())
 }

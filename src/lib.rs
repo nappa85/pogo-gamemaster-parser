@@ -45,7 +45,7 @@ impl League {
         match self {
             League::Mega => 1400..=1500,
             League::Ultra => 2400..=2500,
-            League::Master => 3000..=9999,
+            League::Master => 2500..=9999,
         }
     }
 }
@@ -112,13 +112,13 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
 
     println!("Loaded {} Pokémon-Moveset combinations", movesets.len());
 
-    let filter = if let Some(filename) = team1 {
+    let filter1 = if let Some(filename) = team1 {
         import(filename, &movesets).await?
     }
     else {
         movesets.iter().map(|(i, mv)| (*i, mv)).collect()
     };
-    println!("Team1 is made of {} Pokémon-Moveset combinations", filter.len());
+    println!("Team1 is made of {} Pokémon-Moveset combinations", filter1.len());
     // let teams1 = movesets.iter()
     //     .par_bridge()
     //     .map_with(&movesets, |ms, m1| ms.iter().par_bridge().map(move |m2| (m1, m2)))
@@ -138,10 +138,10 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
     //             t1.1.pokemon.type1 != t2.1.pokemon.type1 &&
     //             Some(&t1.1.pokemon.type1) != t2.1.pokemon.type2.as_ref()
     //     });
-    let teams1 = filter.iter().par_bridge()
-        .map_with(&filter, |ms, m1| ms.iter().par_bridge().map(move |m2| (m1, m2)))
+    let teams1 = filter1.iter().par_bridge()
+        .map_with(&filter1, |ms, m1| ms.iter().par_bridge().map(move |m2| (m1, m2)))
         .flatten()
-        .map_with(&filter, |ms, (m1, m2)| ms.iter().par_bridge().map(move |m3| (m1, m2, m3)))
+        .map_with(&filter1, |ms, (m1, m2)| ms.iter().par_bridge().map(move |m3| (m1, m2, m3)))
         .flatten()
         .filter(|(t0, t1, t2)| {
             // unique pokemon
@@ -150,17 +150,17 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
                 t1.1.pokemon.unique_id != t2.1.pokemon.unique_id
         });
 
-    let filter = if let Some(filename) = team2 {
+    let filter2 = if let Some(filename) = team2 {
         import(filename, &movesets).await?
     }
     else {
         movesets.iter().map(|(i, mv)| (*i, mv)).collect()
     };
-    println!("Team2 is made of {} Pokémon-Moveset combinations", filter.len());
-    let teams2 = filter.iter().par_bridge()
-        .map_with(&filter, |ms, m1| ms.iter().par_bridge().map(move |m2| (m1, m2)))
+    println!("Team2 is made of {} Pokémon-Moveset combinations", filter2.len());
+    let teams2 = filter2.iter().par_bridge()
+        .map_with(&filter2, |ms, m1| ms.iter().par_bridge().map(move |m2| (m1, m2)))
         .flatten()
-        .map_with(&filter, |ms, (m1, m2)| ms.iter().par_bridge().map(move |m3| (m1, m2, m3)))
+        .map_with(&filter2, |ms, (m1, m2)| ms.iter().par_bridge().map(move |m3| (m1, m2, m3)))
         .flatten()
         .filter(|(t0, t1, t2)| {
             // unique pokemon
@@ -183,8 +183,8 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
         .map(|fold| {
             let mut res = HashMap::new();
             for (index, value) in fold.into_iter().map(|(m0, hm)| hm.into_iter().map(move |(m1, hm)| hm.into_iter().map(move |(m2, v)| ((m0, m1, m2), v))).flatten()).flatten() {
-                // let's put a barrier of minumun 1001 won matches
-                if value > 1000 {
+                // let's put a barrier of minumun 10% won matches
+                if value > filter1.len() / 10 {
                     let entry = res.entry(index).or_insert_with(|| 0_usize);
                     *entry += value;
                 }

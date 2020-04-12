@@ -125,7 +125,7 @@ static LEGACY_CHARGED_MOVES: Lazy<HashMap<String, Vec<&'static str>>> = Lazy::ne
     res.insert(String::from("ARTICUNO"), vec!["HURRICANE", "RETURN"]);
     res.insert(String::from("DRATINI"), vec!["RETURN"]);
     res.insert(String::from("DRAGONAIR"), vec!["RETURN"]);
-    res.insert(String::from("DRAGONAIR"), vec!["DRAGON_PULSE", "DRACO_METEOR", "RETURN"]);
+    res.insert(String::from("DRAGONITE"), vec!["DRAGON_PULSE", "DRACO_METEOR", "RETURN"]);
     res.insert(String::from("MEWTWO"), vec!["SHADOW_BALL", "HYPER_BEAM", "PSYSTRIKE"]);
     res.insert(String::from("MEGANIUM"), vec!["FRENZY_PLANT"]);
     res.insert(String::from("TYPHLOSION"), vec!["BLAST_BURN"]);

@@ -1099,12 +1099,12 @@ mod test {
             "durationTurns": 2,
             "energyDelta": 10
         }"#).unwrap();
-        let twister: CombatMove = serde_json::from_str(r#"{
-            "uniqueId": "TWISTER",
-            "type": "POKEMON_TYPE_DRAGON",
-            "power": 45.0,
-            "vfxName": "twister",
-            "energyDelta": -45
+        let hurricane: CombatMove = serde_json::from_str(r#"{
+            "uniqueId": "HURRICANE",
+            "type": "POKEMON_TYPE_FLYING",
+            "power": 110.0,
+            "vfxName": "hurricane",
+            "energyDelta": -65
         }"#).unwrap();
         let icy_wind: CombatMove = serde_json::from_str(r#"{
             "uniqueId": "ICY_WIND",
@@ -1189,7 +1189,7 @@ mod test {
             cpm: cpm[26],
             fast_move: &ice_shard,
             fast_legacy: None,
-            charged_move1: &twister,
+            charged_move1: &hurricane,
             charged_legacy1: Some(true),
             charged_move2: &icy_wind,
             charged_legacy2: None,
