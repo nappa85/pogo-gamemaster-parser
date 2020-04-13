@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
@@ -166,31 +167,9 @@ fn _get_damage(m: &CombatMove, atk: &Moveset, def: &Moveset) -> i32 {
 }
 
 enum DamageType {
+    Change(usize),
     Fast(i32),
     Charged(i32),
-}
-
-fn get_damage(p1: &Moveset, energy: &mut i32, wait: &mut i32, p2: &Moveset) -> DamageType {
-    let charged1_damage = _get_damage(&p1.charged_move1, p1, p2);
-    let charged2_damage = _get_damage(&p1.charged_move2, p1, p2);
-    if charged1_damage > charged2_damage {
-        let energy_delta = p1.charged_move1.energy_delta.unwrap_or_else(|| 0) as i32;
-        if *energy + energy_delta > 0 {
-            *energy += energy_delta;
-            return DamageType::Charged(charged1_damage);
-        }
-    }
-    else {
-        let energy_delta = p2.charged_move1.energy_delta.unwrap_or_else(|| 0) as i32;
-        if *energy + energy_delta > 0 {
-            *energy += energy_delta;
-            return DamageType::Charged(charged2_damage);
-        }
-    }
-
-    *energy += p1.fast_move.energy_delta.unwrap_or_else(|| 0) as i32;
-    *wait = p1.fast_move.duration_turns.unwrap_or_else(|| 0) as i32;
-    DamageType::Fast(_get_damage(&p1.fast_move, p1, p2))
 }
 
 #[derive(Debug, PartialEq)]
@@ -200,125 +179,266 @@ pub enum CombatResult {
     Second,
 }
 
+#[derive(Default)]
+struct Team<'a> {
+    movesets: &'a [&'a Moveset<'a>],
+    pokemon: usize,
+    hp: Vec<i32>,
+    wait: i32,
+    energy: i32,
+    cooldown: i32,
+    fainted: bool,
+}
+
+impl<'a> Team<'a> {
+    fn get_damage(&mut self, p2: &Moveset) -> DamageType {
+        if self.cooldown <= 0 {
+            if let Some(p) = self.get_best_pokemon_against(p2) {
+                if self.pokemon != p {
+                    return DamageType::Change(p);
+                }
+            }
+        }
+        else {
+            self.cooldown -= 1;
+        }
+
+        let charged1_damage = _get_damage(&self.movesets[self.pokemon].charged_move1, &self.movesets[self.pokemon], p2);
+        let charged2_damage = _get_damage(&self.movesets[self.pokemon].charged_move2, &self.movesets[self.pokemon], p2);
+        if charged1_damage > charged2_damage {
+            let energy_delta = self.movesets[self.pokemon].charged_move1.energy_delta.unwrap_or_else(|| 0) as i32;
+            if self.energy + energy_delta > 0 {
+                self.energy += energy_delta;
+                return DamageType::Charged(charged1_damage);
+            }
+        }
+        else {
+            let energy_delta = p2.charged_move1.energy_delta.unwrap_or_else(|| 0) as i32;
+            if self.energy + energy_delta > 0 {
+                self.energy += energy_delta;
+                return DamageType::Charged(charged2_damage);
+            }
+        }
+
+        self.energy += self.movesets[self.pokemon].fast_move.energy_delta.unwrap_or_else(|| 0) as i32;
+        self.wait = self.movesets[self.pokemon].fast_move.duration_turns.unwrap_or_else(|| 0) as i32;
+        DamageType::Fast(_get_damage(&self.movesets[self.pokemon].fast_move, &self.movesets[self.pokemon], p2))
+    }
+
+    fn get_best_pokemon_against(&self, p2: &Moveset) -> Option<usize> {
+        let mut damages: Vec<(usize, f64)> = self.movesets.iter().enumerate().map(|(index, mv)| {
+            if self.hp[index] > 0 {
+                // p1
+                let fast = _get_damage(&mv.fast_move, mv, p2);
+                let charged1_turns = ((mv.charged_move1.energy_delta.unwrap_or_else(|| 0) * -1) / mv.fast_move.energy_delta.unwrap_or_else(|| 0)) as i32;
+                let charged1 = (fast * charged1_turns + _get_damage(&mv.charged_move1, mv, p2)) / charged1_turns;
+                let charged2_turns = ((mv.charged_move2.energy_delta.unwrap_or_else(|| 0) * -1) / mv.fast_move.energy_delta.unwrap_or_else(|| 0)) as i32;
+                let charged2 = (fast * charged2_turns + _get_damage(&mv.charged_move1, mv, p2)) / charged2_turns;
+                let p1_damage = max(charged1, charged2);
+                // p2
+                let fast = _get_damage(&p2.fast_move, p2, mv);
+                let charged1_turns = ((p2.charged_move1.energy_delta.unwrap_or_else(|| 0) * -1) / p2.fast_move.energy_delta.unwrap_or_else(|| 0)) as i32;
+                let charged1 = (fast * charged1_turns + _get_damage(&p2.charged_move1, p2, mv)) / charged1_turns;
+                let charged2_turns = ((p2.charged_move2.energy_delta.unwrap_or_else(|| 0) * -1) / p2.fast_move.energy_delta.unwrap_or_else(|| 0)) as i32;
+                let charged2 = (fast * charged2_turns + _get_damage(&p2.charged_move1, p2, mv)) / charged2_turns;
+                let p2_damage = max(charged1, charged2);
+                Some((index, (p1_damage as f64) / (p2_damage as f64)))
+            }
+            else {
+                None
+            }
+        })
+        .filter(Option::is_some)
+        .map(Option::unwrap)
+        .collect();
+
+        if damages.is_empty() {
+            None
+        }
+        else {
+            damages.sort_unstable_by(|(_, d1), (_, d2)| d1.partial_cmp(d2).unwrap());
+            damages.pop().map(|(index, _)| index)
+        }
+    }
+}
+
 pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) -> CombatResult {
     debug!(
-        "team1 = [{}]\nteam2 = [{}]",
+        "\nteam1 = [{}]\nteam2 = [{}]",
         team1.iter().map(|m| if let Some(form) = m.pokemon.form.as_ref() { form.as_str() } else { m.pokemon.unique_id.as_str() }).collect::<Vec<&str>>().join(", "),
         team2.iter().map(|m| if let Some(form) = m.pokemon.form.as_ref() { form.as_str() } else { m.pokemon.unique_id.as_str() }).collect::<Vec<&str>>().join(", ")
     );
-    let mut team1_pokemon = 0;
-    let mut team1_cp = team1[0].cp as i32;
-    let mut team1_wait = 0;
-    let mut team1_energy = 0;
+    let mut team1 = Team {
+        movesets: team1,
+        hp: team1.iter().map(|mv| (((mv.pokemon.stats.base_stamina as f64) + (mv.sta as f64)) * mv.cpm).floor() as i32).collect(),
+        ..Default::default()
+    };
     let mut team1_damage;
-    let mut team2_pokemon = 0;
-    let mut team2_cp = team2[0].cp as i32;
-    let mut team2_wait = 0;
-    let mut team2_energy = 0;
+    let mut team2 = Team {
+        movesets: team2,
+        hp: team2.iter().map(|mv| (((mv.pokemon.stats.base_stamina as f64) + (mv.sta as f64)) * mv.cpm).floor() as i32).collect(),
+        ..Default::default()
+    };
     let mut team2_damage;
     loop {
-        if team1_wait > 0 {
+        if team1.wait > 0 {
             debug!("team1 waits");
-            team1_wait -= 1;
+            team1.wait -= 1;
             team1_damage = None;
         }
         else {
-            team1_damage = Some(get_damage(&team1[team1_pokemon], &mut team1_energy, &mut team1_wait, &team2[team2_pokemon]));
+            team1_damage = Some(team1.get_damage(&team2.movesets[team2.pokemon]));
         }
-        if team2_wait > 0 {
+        if team2.wait > 0 {
             debug!("team2 waits");
-            team2_wait -= 1;
+            team2.wait -= 1;
             team2_damage = None;
         }
         else {
-            team2_damage = Some(get_damage(&team2[team2_pokemon], &mut team2_energy, &mut team2_wait, &team1[team1_pokemon]));
+            team2_damage = Some(team2.get_damage(&team1.movesets[team1.pokemon]));
         }
 
         match (team1_damage, team2_damage) {
             (Some(DamageType::Charged(d1)), Some(DamageType::Charged(d2))) => {
-                if team1[team1_pokemon].pokemon.stats.base_attack + (team1[team1_pokemon].atk as u16) >= team2[team2_pokemon].pokemon.stats.base_attack + (team2[team2_pokemon].atk as u16) {
+                if team1.movesets[team1.pokemon].pokemon.stats.base_attack + (team1.movesets[team1.pokemon].atk as u16) >= team2.movesets[team2.pokemon].pokemon.stats.base_attack + (team2.movesets[team2.pokemon].atk as u16) {
                     debug!("team1 has priority and deals {} damage with a charged move", d1);
-                    team2_cp -= d1;
-                    if team2_cp > 0 {
+                    team2.hp[team2.pokemon] -= d1;
+                    if team2.hp[team2.pokemon] > 0 {
                         debug!("team2 survives and deals {} damage with a charged move", d2);
-                        team1_cp -= d2;
+                        team1.hp[team1.pokemon] -= d2;
                     }
                 }
                 else {
                     debug!("team2 has priority and deals {} damage with a charged move", d2);
-                    team1_cp -= d2;
-                    if team1_cp > 0 {
+                    team1.hp[team1.pokemon] -= d2;
+                    if team1.hp[team1.pokemon] > 0 {
                         debug!("team1 survives and deals {} damage with a charged move", d1);
-                        team2_cp -= d1;
+                        team2.hp[team2.pokemon] -= d1;
                     }
                 }
             },
             (Some(DamageType::Charged(d1)), Some(DamageType::Fast(d2))) => {
                 debug!("team1 deals {} damage with a charged move", d1);
-                team2_cp -= d1;
-                if team2_cp > 0 {
+                team2.hp[team2.pokemon] -= d1;
+                if team2.hp[team2.pokemon] > 0 {
                     debug!("team2 survives and deals {} damage with a fast move", d2);
-                    team1_cp -= d2;
+                    team1.hp[team1.pokemon] -= d2;
                 }
             },
             (Some(DamageType::Fast(d1)), Some(DamageType::Charged(d2))) => {
                 debug!("team2 deals {} damage with a charged move", d2);
-                team1_cp -= d2;
-                if team1_cp > 0 {
+                team1.hp[team1.pokemon] -= d2;
+                if team1.hp[team1.pokemon] > 0 {
                     debug!("team1 survives and deals {} damage with a fast move", d1);
-                    team2_cp -= d1;
+                    team2.hp[team2.pokemon] -= d1;
                 }
             },
             (Some(DamageType::Fast(d1)), Some(DamageType::Fast(d2))) => {
                 debug!("team1 deals {} damage with a fast move", d1);
-                team1_cp -= d2;
+                team1.hp[team1.pokemon] -= d2;
                 debug!("team2 deals {} damage with a fast move", d2);
-                team2_cp -= d1;
+                team2.hp[team2.pokemon] -= d1;
+            },
+            (Some(DamageType::Fast(d1)), Some(DamageType::Change(p2))) => {
+                debug!("team1 deals {} damage with a fast move", d1);
+                team2.hp[team2.pokemon] -= d1;
+                debug!("team2 switch to {}", team2.movesets[p2].pokemon.unique_id);
+                team2.pokemon = p2;
+                team2.cooldown = 120;
             },
             (Some(DamageType::Fast(d1)), None) => {
                 debug!("team1 deals {} damage with a fast move", d1);
-                team2_cp -= d1;
+                team2.hp[team2.pokemon] -= d1;
+            },
+            (Some(DamageType::Charged(d1)), Some(DamageType::Change(p2))) => {
+                debug!("team1 deals {} damage with a charged move", d1);
+                team2.hp[team2.pokemon] -= d1;
+                debug!("team2 switch to {}", team2.movesets[p2].pokemon.unique_id);
+                team2.pokemon = p2;
+                team2.cooldown = 120;
             },
             (Some(DamageType::Charged(d1)), None) => {
                 debug!("team1 deals {} damage with a charged move", d1);
-                team2_cp -= d1;
+                team2.hp[team2.pokemon] -= d1;
+            },
+            (Some(DamageType::Change(p1)), None) => {
+                debug!("team1 switch to {}", team1.movesets[p1].pokemon.unique_id);
+                team1.pokemon = p1;
+            },
+            (Some(DamageType::Change(p1)), Some(DamageType::Fast(d2))) => {
+                debug!("team2 deals {} damage with a fast move", d2);
+                team1.hp[team1.pokemon] -= d2;
+                debug!("team1 switch to {}", team1.movesets[p1].pokemon.unique_id);
+                team1.pokemon = p1;
+                team2.cooldown = 120;
             },
             (None, Some(DamageType::Fast(d2))) => {
                 debug!("team2 deals {} damage with a fast move", d2);
-                team1_cp -= d2;
+                team1.hp[team1.pokemon] -= d2;
+            },
+            (Some(DamageType::Change(p1)), Some(DamageType::Charged(d2))) => {
+                debug!("team2 deals {} damage with a charged move", d2);
+                team1.hp[team1.pokemon] -= d2;
+                debug!("team1 switch to {}", team1.movesets[p1].pokemon.unique_id);
+                team1.pokemon = p1;
+                team1.cooldown = 120;
             },
             (None, Some(DamageType::Charged(d2))) => {
                 debug!("team2 deals {} damage with a charged move", d2);
-                team1_cp -= d2;
+                team1.hp[team1.pokemon] -= d2;
+            },
+            (None, Some(DamageType::Change(p2))) => {
+                debug!("team2 switch to {}", team2.movesets[p2].pokemon.unique_id);
+                team2.pokemon = p2;
+                team2.cooldown = 120;
+            },
+            (Some(DamageType::Change(p1)), Some(DamageType::Change(p2))) => {
+                debug!("team1 switch to {}", team1.movesets[p1].pokemon.unique_id);
+                team1.pokemon = p1;
+                team1.cooldown = 120;
+                debug!("team2 switch to {}", team2.movesets[p2].pokemon.unique_id);
+                team2.pokemon = p2;
+                team2.cooldown = 120;
             },
             (None, None) => {},
         }
 
-        if team1_cp <= 0 {
+        if team1.hp[team1.pokemon] <= 0 {
             debug!("team1 pokemon faints");
-            team1_pokemon += 1;
-            if team1_pokemon < team1.len() {
-                team1_cp = team2[team1_pokemon].cp as i32;
-                team1_energy = 0;
-                team1_wait = 0;
+            if let Some(p) = team1.get_best_pokemon_against(&team2.movesets[team2.pokemon]) {
+                debug!("team1 switch to {}", team1.movesets[p].pokemon.unique_id);
+                team1.pokemon = p;
+                team1.energy = 0;
+                team1.wait = 0;
+                team1.cooldown = 0;
+            }
+            else {
+                team1.fainted = true;
             }
         }
-        if team2_cp <= 0 {
+        if team2.hp[team2.pokemon] <= 0 {
             debug!("team2 pokemon faints");
-            team2_pokemon += 1;
-            if team2_pokemon < team2.len() {
-                team2_cp = team2[team2_pokemon].cp as i32;
-                team2_energy = 0;
-                team2_wait = 0;
+            // here team2 has the advantage to coose the best pokemon against the new pokemon in case both fainted at the same time
+            // in reality would be a random choice, because you can't know which pokemon the other player will choose
+            // so it's kind of ok
+            if let Some(p) = team2.get_best_pokemon_against(&team1.movesets[team1.pokemon]) {
+                debug!("team2 switch to {}", team2.movesets[p].pokemon.unique_id);
+                team2.pokemon = p;
+                team2.energy = 0;
+                team2.wait = 0;
+                team2.cooldown = 0;
+            }
+            else {
+                team2.fainted = true;
             }
         }
-        if team1_pokemon >= team1.len() && team2_pokemon >= team2.len() {
+        if team1.fainted && team2.fainted {
             return CombatResult::Draw;
         }
-        else if team1_pokemon >= team1.len() {
+        else if team1.fainted {
             return CombatResult::Second;
         }
-        else if team2_pokemon >= team2.len() {
+        else if team2.fainted {
             return CombatResult::First;
         }
         debug!("next turn")
@@ -907,7 +1027,7 @@ mod test {
               "shoulderModeScale": 0.5
             },
             "encounter": {
-              "baseCaptureRate": 0.05,
+              "baseCaptureRate": 0.03,
               "baseFleeRate": 0.1,
               "collisionRadiusM": 0.231,
               "collisionHeightM": 0.66,
@@ -916,8 +1036,8 @@ mod test {
               "movementTimerS": 3.0,
               "jumpTimeS": 1.0,
               "attackTimerS": 8.0,
-              "attackProbability": 0.7,
-              "dodgeProbability": 0.2,
+              "attackProbability": 0.1,
+              "dodgeProbability": 0.15,
               "dodgeDurationS": 1.0,
               "dodgeDistance": 1.0,
               "cameraDistance": 3.7125,
@@ -943,21 +1063,14 @@ mod test {
             "buddySize": "BUDDY_FLYING",
             "modelHeight": 2.6,
             "modelScaleV2": 0.91,
-            "form": "ARTICUNO_SHADOW",
             "buddyOffsetMale": [10.0, -16.9, 28.01],
             "buddyOffsetFemale": [10.0, -16.9, 28.01],
             "buddyScale": 19.0,
             "thirdMove": {
-              "stardustToUnlock": 120000,
-              "candyToUnlock": 120
+              "stardustToUnlock": 100000,
+              "candyToUnlock": 100
             },
             "isTransferable": true,
-            "shadow": {
-              "purificationStardustNeeded": 20000,
-              "purificationCandyNeeded": 20,
-              "purifiedChargeMove": "RETURN",
-              "shadowChargeMove": "FRUSTRATION"
-            },
             "buddyGroupNumber": 7
         }"#).unwrap();
         let swampert: PokemonSettings = serde_json::from_str(r#"{
@@ -1240,7 +1353,7 @@ mod test {
             charged_legacy2: None,
         };
         let start = Local::now();
-        assert_eq!(combat(&[&m0, &m1, &m2], &[&m3, &m4, &m5]), CombatResult::Second);
+        assert_eq!(combat(&[&m0, &m1, &m2], &[&m3, &m4, &m5]), CombatResult::First);
         let end = Local::now();
         info!("took {} nanoseconds", end.timestamp_nanos() - start.timestamp_nanos());
     }
