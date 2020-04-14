@@ -202,20 +202,17 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
     results.par_sort_unstable_by(|(_, a), (_, b)| a.cmp(b));
 
     for ((m0, m1, m2), score) in &results {
-        println!("{} => {{\n {} {} {} {} {}\n {} {} {} {} {}\n {} {} {} {} {}\n}}",
+        println!("{} => {{\n {} {} {} {}\n {} {} {} {}\n {} {} {} {}\n}}",
             score,
-            movesets[m0].pokemon.unique_id,
-            movesets[m0].pokemon.form.as_ref().map(|s| s.as_str()).unwrap_or_else(|| ""),
+            movesets[m0].pokemon.form.as_ref().unwrap_or(&movesets[m0].pokemon.unique_id),
             movesets[m0].fast_move.unique_id,
             movesets[m0].charged_move1.unique_id,
             movesets[m0].charged_move2.unique_id,
-            movesets[m1].pokemon.unique_id,
-            movesets[m1].pokemon.form.as_ref().map(|s| s.as_str()).unwrap_or_else(|| ""),
+            movesets[m1].pokemon.form.as_ref().unwrap_or(&movesets[m1].pokemon.unique_id),
             movesets[m1].fast_move.unique_id,
             movesets[m1].charged_move1.unique_id,
             movesets[m1].charged_move2.unique_id,
-            movesets[m2].pokemon.unique_id,
-            movesets[m2].pokemon.form.as_ref().map(|s| s.as_str()).unwrap_or_else(|| ""),
+            movesets[m2].pokemon.form.as_ref().unwrap_or(&movesets[m2].pokemon.unique_id),
             movesets[m2].fast_move.unique_id,
             movesets[m2].charged_move1.unique_id,
             movesets[m2].charged_move2.unique_id
