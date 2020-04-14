@@ -5,6 +5,8 @@ use std::collections::HashMap;
 
 use rayon::{iter::{ParallelBridge, ParallelIterator}, slice::ParallelSliceMut};
 
+use itertools::Itertools;
+
 use log::error;
 
 use structopt::StructOpt;
@@ -139,9 +141,7 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
     //             Some(&t1.1.pokemon.type1) != t2.1.pokemon.type2.as_ref()
     //     });
     let teams1 = filter1.iter().par_bridge()
-        .map_with(&filter1, |ms, m1| ms.iter().par_bridge().map(move |m2| (m1, m2)))
-        .flatten()
-        .map_with(&filter1, |ms, (m1, m2)| ms.iter().par_bridge().map(move |m3| (m1, m2, m3)))
+        .map_with(&filter1, |ms, m1| ms.iter().combinations(2).par_bridge().map(move |m2| (m1, m2[0], m2[1])))
         .flatten()
         .filter(|(t0, t1, t2)| {
             // unique pokemon
@@ -158,9 +158,7 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
     };
     println!("Team2 is made of {} Pokémon-Moveset combinations", filter2.len());
     let teams2 = filter2.iter().par_bridge()
-        .map_with(&filter2, |ms, m1| ms.iter().par_bridge().map(move |m2| (m1, m2)))
-        .flatten()
-        .map_with(&filter2, |ms, (m1, m2)| ms.iter().par_bridge().map(move |m3| (m1, m2, m3)))
+        .map_with(&filter2, |ms, m1| ms.iter().combinations(2).par_bridge().map(move |m2| (m1, m2[0], m2[1])))
         .flatten()
         .filter(|(t0, t1, t2)| {
             // unique pokemon
@@ -184,10 +182,10 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
             let mut res = HashMap::new();
             for (index, value) in fold.into_iter().map(|(m0, hm)| hm.into_iter().map(move |(m1, hm)| hm.into_iter().map(move |(m2, v)| ((m0, m1, m2), v))).flatten()).flatten() {
                 // let's put a barrier of minumun 10% won matches
-                if value > filter1.len() / 10 {
+                // if value > filter1.len() / 10 {
                     let entry = res.entry(index).or_insert_with(|| 0_usize);
                     *entry += value;
-                }
+                // }
             }
             res
         })
