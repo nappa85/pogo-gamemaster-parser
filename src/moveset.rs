@@ -199,6 +199,7 @@ static LEGACY_CHARGED_MOVES: Lazy<HashMap<String, Vec<&'static str>>> = Lazy::ne
 pub struct Moveset<'a> {
     pub pokemon: &'a PokemonSettings,
     pub cp: u32,
+    pub hp: u32,
     pub level: u8,
     pub atk: u8,
     pub def: u8,
@@ -223,6 +224,7 @@ impl<'a> Moveset<'a>{
                             res.push(Moveset {
                                 pokemon: p,
                                 cp: cp,
+                                hp: (((p.stats.base_stamina as f64) + (sta as f64)) * player_level.cp_multiplier[(level - 1) as usize]).floor() as u32,
                                 level: level,
                                 atk: atk,
                                 def: def,
