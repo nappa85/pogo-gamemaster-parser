@@ -1,11 +1,11 @@
-use std::cmp::max;
+use std::cmp::{max, min};
 use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 
 use log::debug;
 
-use crate::entities::{CombatMove/*, PokemonSettings*/};
+use crate::entities::{CombatMove, CombatStatStageSettings};
 use crate::moveset::Moveset;
 
 // EFFECTIVENESS[atk_type][def_type]
@@ -167,8 +167,8 @@ pub enum CombatResult {
 
 #[derive(Default)]
 struct Buff {
-    atk: i16,
-    def: i16,
+    atk: i8,
+    def: i8,
 }
 
 #[derive(Default)]
@@ -185,22 +185,24 @@ struct Team<'a> {
 }
 
 impl<'a> Team<'a> {
-    fn get_atk(&self) -> u16 {
-        ((self.movesets[self.pokemon].pokemon.stats.base_attack as i16) + (self.movesets[self.pokemon].atk as i16) + self.buffs.get(&self.pokemon).map(|b| b.atk).unwrap_or(0)) as u16
+    fn get_atk(&self, combat_stat_stage_settings: &CombatStatStageSettings) -> f64 {
+        let multiplier = combat_stat_stage_settings.attack_buff_multiplier[(5_i8 + self.buffs.get(&self.pokemon).map(|b| b.atk).unwrap_or(0)) as usize];
+        ((self.movesets[self.pokemon].pokemon.stats.base_attack + (self.movesets[self.pokemon].atk as u16)) as f64) * multiplier
     }
 
-    fn get_def(&self) -> u16 {
-        ((self.movesets[self.pokemon].pokemon.stats.base_defense as i16) + (self.movesets[self.pokemon].def as i16) + self.buffs.get(&self.pokemon).map(|b| b.def).unwrap_or(0)) as u16
+    fn get_def(&self, combat_stat_stage_settings: &CombatStatStageSettings) -> f64 {
+        let multiplier = combat_stat_stage_settings.defense_buff_multiplier[(5_i8 + self.buffs.get(&self.pokemon).map(|b| b.def).unwrap_or(0)) as usize];
+        ((self.movesets[self.pokemon].pokemon.stats.base_defense + (self.movesets[self.pokemon].def as u16)) as f64) * multiplier
     }
 
-    fn get_damage(&mut self, t2: &Team) -> DamageType {
+    fn get_damage(&mut self, t2: &Team, combat_stat_stage_settings: &CombatStatStageSettings) -> DamageType {
         if self.wait > 0 {
             self.wait -= 1;
             return DamageType::Wait;
         }
 
         if self.cooldown <= 0 {
-            if let Some(p) = self.get_best_pokemon_against(t2) {
+            if let Some(p) = self.get_best_pokemon_against(t2, combat_stat_stage_settings) {
                 if self.pokemon != p {
                     return DamageType::Change(p);
                 }
@@ -210,8 +212,8 @@ impl<'a> Team<'a> {
             self.cooldown -= 1;
         }
 
-        let charged1_damage = self._get_damage(&self.movesets[self.pokemon].charged_move1, t2);
-        let charged2_damage = self._get_damage(&self.movesets[self.pokemon].charged_move2, t2);
+        let charged1_damage = self._get_damage(&self.movesets[self.pokemon].charged_move1, t2, combat_stat_stage_settings);
+        let charged2_damage = self._get_damage(&self.movesets[self.pokemon].charged_move2, t2, combat_stat_stage_settings);
         if charged1_damage > charged2_damage {
             let energy_delta = self.movesets[self.pokemon].charged_move1.energy_delta.unwrap_or_else(|| 0) as i32;
             if self.energy + energy_delta > 0 {
@@ -229,10 +231,10 @@ impl<'a> Team<'a> {
 
         self.energy += self.movesets[self.pokemon].fast_move.energy_delta.unwrap_or_else(|| 0) as i32;
         self.wait = self.movesets[self.pokemon].fast_move.duration_turns.unwrap_or_else(|| 0) as i32;
-        DamageType::Fast(self._get_damage(&self.movesets[self.pokemon].fast_move, t2))
+        DamageType::Fast(self._get_damage(&self.movesets[self.pokemon].fast_move, t2, combat_stat_stage_settings))
     }
 
-    fn _get_damage(&self, m: &CombatMove, def: &Team) -> i32 {
+    fn _get_damage(&self, m: &CombatMove, def: &Team, combat_stat_stage_settings: &CombatStatStageSettings) -> i32 {
         let mut multipliers = 1.0;
         //stab
         if m.r#type == self.movesets[self.pokemon].pokemon.type1 || Some(&m.r#type) == self.movesets[self.pokemon].pokemon.type2.as_ref() {
@@ -243,27 +245,27 @@ impl<'a> Team<'a> {
             multipliers *= EFFECTIVENESS[&m.r#type].get(type2).cloned().unwrap_or_else(|| 1.0);
         }
         ((0.5 * (m.power.unwrap_or_else(|| 0.0_f32) as f64) *
-            (((self.get_atk() as f64) * self.movesets[self.pokemon].cpm) / ((def.get_def() as f64) * def.movesets[def.pokemon].cpm)) *
+            ((self.get_atk(combat_stat_stage_settings) * self.movesets[self.pokemon].cpm) / (def.get_def(combat_stat_stage_settings) * def.movesets[def.pokemon].cpm)) *
             multipliers).floor() as i32) + 1
     }
 
-    fn get_best_pokemon_against(&self, t2: &Team) -> Option<usize> {
+    fn get_best_pokemon_against(&self, t2: &Team, combat_stat_stage_settings: &CombatStatStageSettings) -> Option<usize> {
         let mut damages: Vec<(usize, f64)> = self.movesets.iter().enumerate().map(|(index, mv)| {
             if self.hp[index] > 0 {
                 // p1
-                let fast = self._get_damage(&mv.fast_move, t2);
+                let fast = self._get_damage(&mv.fast_move, t2, combat_stat_stage_settings);
                 let charged1_turns = ((mv.charged_move1.energy_delta.unwrap_or_else(|| 0) * -1) / mv.fast_move.energy_delta.unwrap_or_else(|| 0)) as i32;
-                let charged1 = (fast * charged1_turns + self._get_damage(&mv.charged_move1, t2)) / charged1_turns;
+                let charged1 = (fast * charged1_turns + self._get_damage(&mv.charged_move1, t2, combat_stat_stage_settings)) / charged1_turns;
                 let charged2_turns = ((mv.charged_move2.energy_delta.unwrap_or_else(|| 0) * -1) / mv.fast_move.energy_delta.unwrap_or_else(|| 0)) as i32;
-                let charged2 = (fast * charged2_turns + self._get_damage(&mv.charged_move1, t2)) / charged2_turns;
+                let charged2 = (fast * charged2_turns + self._get_damage(&mv.charged_move1, t2, combat_stat_stage_settings)) / charged2_turns;
                 let p1_damage = max(charged1, charged2);
                 // p2
                 let p2 = &t2.movesets[t2.pokemon];
-                let fast = t2._get_damage(&p2.fast_move, self);
+                let fast = t2._get_damage(&p2.fast_move, self, combat_stat_stage_settings);
                 let charged1_turns = ((p2.charged_move1.energy_delta.unwrap_or_else(|| 0) * -1) / p2.fast_move.energy_delta.unwrap_or_else(|| 0)) as i32;
-                let charged1 = (fast * charged1_turns + t2._get_damage(&p2.charged_move1, self)) / charged1_turns;
+                let charged1 = (fast * charged1_turns + t2._get_damage(&p2.charged_move1, self, combat_stat_stage_settings)) / charged1_turns;
                 let charged2_turns = ((p2.charged_move2.energy_delta.unwrap_or_else(|| 0) * -1) / p2.fast_move.energy_delta.unwrap_or_else(|| 0)) as i32;
-                let charged2 = (fast * charged2_turns + t2._get_damage(&p2.charged_move1, self)) / charged2_turns;
+                let charged2 = (fast * charged2_turns + t2._get_damage(&p2.charged_move1, self, combat_stat_stage_settings)) / charged2_turns;
                 let p2_damage = max(charged1, charged2);
                 Some((index, (p1_damage as f64) / (p2_damage as f64)))
             }
@@ -307,7 +309,7 @@ impl<'a> Team<'a> {
         false
     }
 
-    fn apply_buffs(&mut self, is_third_move: bool, defender: &mut Team) {
+    fn apply_buffs(&mut self, is_third_move: bool, defender: &mut Team, combat_stat_stage_settings: &CombatStatStageSettings) {
         let buffs = if is_third_move {
             &self.movesets[self.pokemon].charged_move2.buffs
         }
@@ -319,28 +321,32 @@ impl<'a> Team<'a> {
             if buff.buff_activation_chance == 1.0 {
                 let entry = self.buffs.entry(self.pokemon).or_insert_with(Default::default);
                 if let Some(atk) = buff.attacker_attack_stat_stage_change {
-                    debug!("Applied atk {} buff to the attacker", atk);
-                    entry.atk += atk as i16;
+                    let val = min(max(entry.atk + atk, combat_stat_stage_settings.minimum_stat_stage), combat_stat_stage_settings.maximum_stat_stage);
+                    debug!("Applied atk {} buff to the attacker, now is {}", atk, val);
+                    entry.atk = val;
                 }
                 if let Some(def) = buff.attacker_defense_stat_stage_change {
-                    debug!("Applied def {} buff to the attacker", def);
-                    entry.def += def as i16;
+                    let val = min(max(entry.def + def, combat_stat_stage_settings.minimum_stat_stage), combat_stat_stage_settings.maximum_stat_stage);
+                    debug!("Applied def {} buff to the attacker, now is {}", def, val);
+                    entry.atk = val;
                 }
                 let entry = defender.buffs.entry(defender.pokemon).or_insert_with(Default::default);
                 if let Some(atk) = buff.target_attack_stat_stage_change {
-                    debug!("Applied atk {} buff to the defender", atk);
-                    entry.atk += atk as i16;
+                    let val = min(max(entry.atk + atk, combat_stat_stage_settings.minimum_stat_stage), combat_stat_stage_settings.maximum_stat_stage);
+                    debug!("Applied atk {} buff to the defender, now is {}", atk, val);
+                    entry.atk = val;
                 }
                 if let Some(def) = buff.target_defense_stat_stage_change {
-                    debug!("Applied def {} buff to the defender", def);
-                    entry.def += def as i16;
+                    let val = min(max(entry.def + def, combat_stat_stage_settings.minimum_stat_stage), combat_stat_stage_settings.maximum_stat_stage);
+                    debug!("Applied def {} buff to the defender, now is {}", def, val);
+                    entry.atk = val;
                 }
             }
         }
     }
 }
 
-pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) -> CombatResult {
+pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>], combat_stat_stage_settings: &CombatStatStageSettings) -> CombatResult {
     debug!(
         "\nteam1 = [{}]\nteam2 = [{}]",
         team1.iter().map(|m| if let Some(form) = m.pokemon.form.as_ref() { form.as_str() } else { m.pokemon.unique_id.as_str() }).collect::<Vec<&str>>().join(", "),
@@ -359,9 +365,9 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
         ..Default::default()
     };
     loop {
-        match (team1.get_damage(&team2), team2.get_damage(&team1)) {
+        match (team1.get_damage(&team2, combat_stat_stage_settings), team2.get_damage(&team1, combat_stat_stage_settings)) {
             (DamageType::Charged((c1, d1)), DamageType::Charged((c2, d2))) => {
-                if team1.get_atk() >= team2.get_atk() {
+                if team1.get_atk(combat_stat_stage_settings) >= team2.get_atk(combat_stat_stage_settings) {
                     debug!("team1 has priority and deals {} damage with a charged move", d1);
                     if team2.use_shield(d1, Some((d2, team2.hp[team2.pokemon]))) {
                         debug!("team2 denies damage with a shield");
@@ -369,7 +375,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                     else {
                         team2.hp[team2.pokemon] -= d1;
                     }
-                    team1.apply_buffs(c1, &mut team2);
+                    team1.apply_buffs(c1, &mut team2, combat_stat_stage_settings);
                     if team2.hp[team2.pokemon] > 0 {
                         debug!("team2 survives and deals {} damage with a charged move", d2);
                         if team1.use_shield(d2, Some((d1, team1.hp[team1.pokemon]))) {
@@ -378,7 +384,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                         else {
                             team1.hp[team1.pokemon] -= d2;
                         }
-                        team2.apply_buffs(c2, &mut team1);
+                        team2.apply_buffs(c2, &mut team1, combat_stat_stage_settings);
                     }
                 }
                 else {
@@ -389,7 +395,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                     else {
                         team1.hp[team1.pokemon] -= d2;
                     }
-                    team2.apply_buffs(c2, &mut team1);
+                    team2.apply_buffs(c2, &mut team1, combat_stat_stage_settings);
                     if team1.hp[team1.pokemon] > 0 {
                         debug!("team1 survives and deals {} damage with a charged move", d1);
                         if team2.use_shield(d1, Some((d2, team2.hp[team2.pokemon]))) {
@@ -398,7 +404,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                         else {
                             team2.hp[team2.pokemon] -= d1;
                         }
-                        team1.apply_buffs(c1, &mut team2);
+                        team1.apply_buffs(c1, &mut team2, combat_stat_stage_settings);
                     }
                 }
             },
@@ -410,7 +416,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 else {
                     team2.hp[team2.pokemon] -= d1;
                 }
-                team1.apply_buffs(c1, &mut team2);
+                team1.apply_buffs(c1, &mut team2, combat_stat_stage_settings);
                 if team2.hp[team2.pokemon] > 0 {
                     debug!("team2 survives and deals {} damage with a fast move", d2);
                     team1.hp[team1.pokemon] -= d2;
@@ -424,7 +430,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 else {
                     team1.hp[team1.pokemon] -= d2;
                 }
-                team2.apply_buffs(c2, &mut team1);
+                team2.apply_buffs(c2, &mut team1, combat_stat_stage_settings);
                 if team1.hp[team1.pokemon] > 0 {
                     debug!("team1 survives and deals {} damage with a fast move", d1);
                     team2.hp[team2.pokemon] -= d1;
@@ -456,7 +462,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 else {
                     team2.hp[team2.pokemon] -= d1;
                 }
-                team1.apply_buffs(c1, &mut team2);
+                team1.apply_buffs(c1, &mut team2, combat_stat_stage_settings);
                 debug!("team2 switch to {}", team2.movesets[p2].pokemon.unique_id);
                 team2.pokemon = p2;
                 team2.cooldown = 120;
@@ -469,7 +475,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 else {
                     team2.hp[team2.pokemon] -= d1;
                 }
-                team1.apply_buffs(c1, &mut team2);
+                team1.apply_buffs(c1, &mut team2, combat_stat_stage_settings);
                 debug!("team2 waits");
             },
             (DamageType::Change(p1), DamageType::Wait) => {
@@ -497,7 +503,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 else {
                     team1.hp[team1.pokemon] -= d2;
                 }
-                team2.apply_buffs(c2, &mut team1);
+                team2.apply_buffs(c2, &mut team1, combat_stat_stage_settings);
                 debug!("team1 switch to {}", team1.movesets[p1].pokemon.unique_id);
                 team1.pokemon = p1;
                 team1.cooldown = 120;
@@ -511,7 +517,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 else {
                     team1.hp[team1.pokemon] -= d2;
                 }
-                team2.apply_buffs(c2, &mut team1);
+                team2.apply_buffs(c2, &mut team1, combat_stat_stage_settings);
             },
             (DamageType::Wait, DamageType::Change(p2)) => {
                 debug!("team1 waits");
@@ -535,7 +541,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
 
         if team1.hp[team1.pokemon] <= 0 {
             debug!("team1 pokemon faints");
-            if let Some(p) = team1.get_best_pokemon_against(&team2) {
+            if let Some(p) = team1.get_best_pokemon_against(&team2, combat_stat_stage_settings) {
                 debug!("team1 switch to {}", team1.movesets[p].pokemon.unique_id);
                 team1.pokemon = p;
                 team1.energy = 0;
@@ -551,7 +557,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
             // here team2 has the advantage to coose the best pokemon against the new pokemon in case both fainted at the same time
             // in reality would be a random choice, because you can't know which pokemon the other player will choose
             // so it's kind of ok
-            if let Some(p) = team2.get_best_pokemon_against(&team1) {
+            if let Some(p) = team2.get_best_pokemon_against(&team1, combat_stat_stage_settings) {
                 debug!("team2 switch to {}", team2.movesets[p].pokemon.unique_id);
                 team2.pokemon = p;
                 team2.energy = 0;
@@ -579,17 +585,26 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
 mod test {
     use chrono::offset::Local;
 
+    use once_cell::sync::Lazy;
+
     use log::info;
 
     use super::{combat, CombatResult};
-    use crate::entities::{PokemonSettings, CombatMove};
+    use crate::entities::{PokemonSettings, CombatMove, CombatStatStageSettings};
     use crate::moveset::Moveset;
+
+    static CPM: Lazy<[f64; 45]> = Lazy::new(|| [0.094, 0.16639787, 0.21573247, 0.25572005, 0.29024988, 0.3210876, 0.34921268, 0.3752356, 0.39956728, 0.4225, 0.44310755, 0.4627984, 0.48168495, 0.49985844, 0.51739395, 0.5343543, 0.5507927, 0.5667545, 0.5822789, 0.5974, 0.6121573, 0.6265671, 0.64065295, 0.65443563, 0.667934, 0.6811649, 0.69414365, 0.7068842, 0.7193991, 0.7317, 0.7377695, 0.74378943, 0.74976104, 0.7556855, 0.76156384, 0.76739717, 0.7731865, 0.77893275, 0.784637, 0.7903, 0.7953, 0.8003, 0.8053, 0.8103, 0.8153]);
+    static CSSS: Lazy<CombatStatStageSettings> = Lazy::new(|| serde_json::from_str(r#"{
+        "minimumStatStage": -4,
+        "maximumStatStage": 4,
+        "attackBuffMultiplier": [0.5, 0.5714286, 0.6666667, 0.8, 1.0, 1.25, 1.5, 1.75, 2.0],
+        "defenseBuffMultiplier": [0.5, 0.5714286, 0.6666667, 0.8, 1.0, 1.25, 1.5, 1.75, 2.0]
+    }"#).unwrap());
 
     #[test]
     fn draw() {
         env_logger::try_init().ok();
 
-        let cpm = [0.094, 0.16639787, 0.21573247, 0.25572005, 0.29024988, 0.3210876, 0.34921268, 0.3752356, 0.39956728, 0.4225, 0.44310755, 0.4627984, 0.48168495, 0.49985844, 0.51739395, 0.5343543, 0.5507927, 0.5667545, 0.5822789, 0.5974, 0.6121573, 0.6265671, 0.64065295, 0.65443563, 0.667934, 0.6811649, 0.69414365, 0.7068842, 0.7193991, 0.7317, 0.7377695, 0.74378943, 0.74976104, 0.7556855, 0.76156384, 0.76739717, 0.7731865, 0.77893275, 0.784637, 0.7903, 0.7953, 0.8003, 0.8053, 0.8103, 0.8153];
         let giratina: PokemonSettings = serde_json::from_str(r#"{
             "uniqueId": "GIRATINA",
             "modelScale": 1.26,
@@ -680,12 +695,12 @@ mod test {
         let m0 = Moveset {
             pokemon: &giratina,
             cp: 2495,
-            hp: (((giratina.stats.base_stamina as f64) + 10_f64) * cpm[26]).floor() as u32,
+            hp: (((giratina.stats.base_stamina as f64) + 10_f64) * CPM[26]).floor() as u32,
             level: 27,
             atk: 10,
             def: 10,
             sta: 10,
-            cpm: cpm[26],
+            cpm: CPM[26],
             fast_move: &dragon_breath,
             fast_legacy: None,
             charged_move1: &dragon_claw,
@@ -695,14 +710,13 @@ mod test {
         };
         // it's not a Draw becase team1 has priority on equal atk stats
         // assert_eq!(combat(&[&m0], &[&m0]), CombatResult::Draw);
-        assert_eq!(combat(&[&m0], &[&m0]), CombatResult::First);
+        assert_eq!(combat(&[&m0], &[&m0], &CSSS), CombatResult::First);
     }
 
     #[test]
     fn giratina_vs_togekiss() {
         env_logger::try_init().ok();
 
-        let cpm = [0.094, 0.16639787, 0.21573247, 0.25572005, 0.29024988, 0.3210876, 0.34921268, 0.3752356, 0.39956728, 0.4225, 0.44310755, 0.4627984, 0.48168495, 0.49985844, 0.51739395, 0.5343543, 0.5507927, 0.5667545, 0.5822789, 0.5974, 0.6121573, 0.6265671, 0.64065295, 0.65443563, 0.667934, 0.6811649, 0.69414365, 0.7068842, 0.7193991, 0.7317, 0.7377695, 0.74378943, 0.74976104, 0.7556855, 0.76156384, 0.76739717, 0.7731865, 0.77893275, 0.784637, 0.7903, 0.7953, 0.8003, 0.8053, 0.8103, 0.8153];
         let giratina: PokemonSettings = serde_json::from_str(r#"{
             "uniqueId": "GIRATINA",
             "modelScale": 1.26,
@@ -870,12 +884,12 @@ mod test {
         let m0 = Moveset {
             pokemon: &giratina,
             cp: 2495,
-            hp: (((giratina.stats.base_stamina as f64) + 10_f64) * cpm[26]).floor() as u32,
+            hp: (((giratina.stats.base_stamina as f64) + 10_f64) * CPM[26]).floor() as u32,
             level: 27,
             atk: 10,
             def: 10,
             sta: 10,
-            cpm: cpm[26],
+            cpm: CPM[26],
             fast_move: &dragon_breath,
             fast_legacy: None,
             charged_move1: &dragon_claw,
@@ -886,12 +900,12 @@ mod test {
         let m1 = Moveset {
             pokemon: &togekiss,
             cp: 2499,
-            hp: (((togekiss.stats.base_stamina as f64) + 15_f64) * cpm[27]).floor() as u32,
+            hp: (((togekiss.stats.base_stamina as f64) + 15_f64) * CPM[27]).floor() as u32,
             level: 28,
             atk: 0,
             def: 15,
             sta: 15,
-            cpm: cpm[27],
+            cpm: CPM[27],
             fast_move: &charm,
             fast_legacy: None,
             charged_move1: &aerial_ace,
@@ -899,14 +913,13 @@ mod test {
             charged_move2: &ancient_power,
             charged_legacy2: None,
         };
-        assert_eq!(combat(&[&m0], &[&m1]), CombatResult::Second);
+        assert_eq!(combat(&[&m0], &[&m1], &CSSS), CombatResult::Second);
     }
 
     #[test]
     fn timing() {
         env_logger::try_init().ok();
 
-        let cpm = [0.094, 0.16639787, 0.21573247, 0.25572005, 0.29024988, 0.3210876, 0.34921268, 0.3752356, 0.39956728, 0.4225, 0.44310755, 0.4627984, 0.48168495, 0.49985844, 0.51739395, 0.5343543, 0.5507927, 0.5667545, 0.5822789, 0.5974, 0.6121573, 0.6265671, 0.64065295, 0.65443563, 0.667934, 0.6811649, 0.69414365, 0.7068842, 0.7193991, 0.7317, 0.7377695, 0.74378943, 0.74976104, 0.7556855, 0.76156384, 0.76739717, 0.7731865, 0.77893275, 0.784637, 0.7903, 0.7953, 0.8003, 0.8053, 0.8103, 0.8153];
         let giratina: PokemonSettings = serde_json::from_str(r#"{
             "uniqueId": "GIRATINA",
             "modelScale": 1.26,
@@ -1400,12 +1413,12 @@ mod test {
         let m0 = Moveset {
             pokemon: &giratina,
             cp: 2491,
-            hp: (((giratina.stats.base_stamina as f64) + 14_f64) * cpm[25]).floor() as u32,
+            hp: (((giratina.stats.base_stamina as f64) + 14_f64) * CPM[25]).floor() as u32,
             level: 26,
             atk: 10,
             def: 15,
             sta: 14,
-            cpm: cpm[25],
+            cpm: CPM[25],
             fast_move: &dragon_breath,
             fast_legacy: None,
             charged_move1: &dragon_claw,
@@ -1416,12 +1429,12 @@ mod test {
         let m1 = Moveset {
             pokemon: &swampert,
             cp: 2472,
-            hp: (((swampert.stats.base_stamina as f64) + 14_f64) * cpm[28]).floor() as u32,
+            hp: (((swampert.stats.base_stamina as f64) + 14_f64) * CPM[28]).floor() as u32,
             level: 29,
             atk: 13,
             def: 14,
             sta: 14,
-            cpm: cpm[28],
+            cpm: CPM[28],
             fast_move: &mud_shot,
             fast_legacy: None,
             charged_move1: &hydro_cannon,
@@ -1432,12 +1445,12 @@ mod test {
         let m2 = Moveset {
             pokemon: &articuno,
             cp: 2469,
-            hp: (((articuno.stats.base_stamina as f64) + 13_f64) * cpm[27]).floor() as u32,
+            hp: (((articuno.stats.base_stamina as f64) + 13_f64) * CPM[27]).floor() as u32,
             level: 28,
             atk: 15,
             def: 14,
             sta: 13,
-            cpm: cpm[27],
+            cpm: CPM[27],
             fast_move: &ice_shard,
             fast_legacy: None,
             charged_move1: &hurricane,
@@ -1448,12 +1461,12 @@ mod test {
         let m3 = Moveset {
             pokemon: &togekiss,
             cp: 2461,
-            hp: (((togekiss.stats.base_stamina as f64) + 11_f64) * cpm[25]).floor() as u32,
+            hp: (((togekiss.stats.base_stamina as f64) + 11_f64) * CPM[25]).floor() as u32,
             level: 26,
             atk: 14,
             def: 10,
             sta: 11,
-            cpm: cpm[25],
+            cpm: CPM[25],
             fast_move: &charm,
             fast_legacy: None,
             charged_move1: &aerial_ace,
@@ -1464,12 +1477,12 @@ mod test {
         let m4 = Moveset {
             pokemon: &sceptile,
             cp: 2490,
-            hp: (((sceptile.stats.base_stamina as f64) + 5_f64) * cpm[37]).floor() as u32,
+            hp: (((sceptile.stats.base_stamina as f64) + 5_f64) * CPM[37]).floor() as u32,
             level: 38,
             atk: 4,
             def: 13,
             sta: 5,
-            cpm: cpm[37],
+            cpm: CPM[37],
             fast_move: &fury_cutter,
             fast_legacy: None,
             charged_move1: &frenzy_plant,
@@ -1480,12 +1493,12 @@ mod test {
         let m5 = Moveset {
             pokemon: &dialga,
             cp: 2469,
-            hp: (((dialga.stats.base_stamina as f64) + 14_f64) * cpm[20]).floor() as u32,
+            hp: (((dialga.stats.base_stamina as f64) + 14_f64) * CPM[20]).floor() as u32,
             level: 21,
             atk: 15,
             def: 14,
             sta: 14,
-            cpm: cpm[20],
+            cpm: CPM[20],
             fast_move: &dragon_breath,
             fast_legacy: None,
             charged_move1: &draco_meteor,
@@ -1494,7 +1507,7 @@ mod test {
             charged_legacy2: None,
         };
         let start = Local::now();
-        assert_eq!(combat(&[&m0, &m1, &m2], &[&m3, &m4, &m5]), CombatResult::Second);
+        assert_eq!(combat(&[&m0, &m1, &m2], &[&m3, &m4, &m5], &CSSS), CombatResult::Second);
         let end = Local::now();
         info!("took {} nanoseconds", end.timestamp_nanos() - start.timestamp_nanos());
     }

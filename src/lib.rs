@@ -69,6 +69,12 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
         .map(|item| item.player_level.as_ref().unwrap())
         .unwrap();
 
+    //load Buffs multipliers
+    let combat_stat_stage_settings = root.item_template.iter()
+        .find(|item| item.combat_stat_stage_settings.is_some())
+        .map(|item| item.combat_stat_stage_settings.as_ref().unwrap())
+        .unwrap();
+
     // create PVP moves dictionary
     let combat_moves: HashMap<&str, &CombatMove> = root.item_template.iter()
         .filter(|item| item.combat_move.is_some())
@@ -170,7 +176,7 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
     let matches = teams1.map_with(teams2, |ts, t1| ts.clone().map(move |t2| (t1, t2)))
         .flatten()
         .fold(HashMap::new, |mut dict, ((t0_0, t0_1, t0_2), (t1_0, t1_1, t1_2))| {
-            let entry = match combat(&[t0_0.1, t0_1.1, t0_2.1], &[t1_0.1, t1_1.1, t1_2.1]) {
+            let entry = match combat(&[t0_0.1, t0_1.1, t0_2.1], &[t1_0.1, t1_1.1, t1_2.1], &combat_stat_stage_settings) {
                 CombatResult::First => dict.entry(*t0_0.0).or_insert_with(HashMap::new).entry(*t0_1.0).or_insert_with(HashMap::new).entry(*t0_2.0).or_insert_with(|| 0),
                 // CombatResult::Second => dict.entry(*t1_0.0).or_insert_with(HashMap::new).entry(*t1_1.0).or_insert_with(HashMap::new).entry(*t1_2.0).or_insert_with(|| 0),
                 _ => return dict,

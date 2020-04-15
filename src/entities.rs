@@ -20,6 +20,8 @@ pub struct Template {
     #[serde(rename = "playerLevel")]
     pub player_level: Option<PlayerLevel>,
     pub pokemon: Option<PokemonSettings>,
+    #[serde(rename = "combatStatStageSettings")]
+    pub combat_stat_stage_settings: Option<CombatStatStageSettings>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -260,4 +262,17 @@ pub struct Shadow {
     pub purified_charge_move: String,
     #[serde(rename = "shadowChargeMove")]
     pub shadow_charge_move: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CombatStatStageSettings {
+    #[serde(rename = "minimumStatStage")]
+    pub minimum_stat_stage: i8,
+    #[serde(rename = "maximumStatStage")]
+    pub maximum_stat_stage: i8,
+    #[serde(rename = "attackBuffMultiplier")]
+    pub attack_buff_multiplier: Vec<f64>,
+    #[serde(rename = "defenseBuffMultiplier")]
+    pub defense_buff_multiplier: Vec<f64>,
 }
