@@ -151,25 +151,11 @@ static EFFECTIVENESS: Lazy<HashMap<String, HashMap<String, f64>>> = Lazy::new(||
     res
 });
 
-fn _get_damage(m: &CombatMove, atk: &Moveset, def: &Moveset) -> i32 {
-    let mut multipliers = 1.0;
-    //stab
-    if m.r#type == atk.pokemon.type1 || Some(&m.r#type) == atk.pokemon.type2.as_ref() {
-        multipliers *= 1.2;
-    }
-    multipliers *= EFFECTIVENESS[&m.r#type].get(&def.pokemon.type1).cloned().unwrap_or_else(|| 1.0);
-    if let Some(type2) = atk.pokemon.type2.as_ref() {
-        multipliers *= EFFECTIVENESS[&m.r#type].get(type2).cloned().unwrap_or_else(|| 1.0);
-    }
-    ((0.5 * (m.power.unwrap_or_else(|| 0.0_f32) as f64) *
-        ((((atk.pokemon.stats.base_attack as f64) + (atk.atk as f64)) * atk.cpm) / (((def.pokemon.stats.base_defense as f64) + (def.def as f64)) * def.cpm)) *
-        multipliers).floor() as i32) + 1
-}
-
 enum DamageType {
     Change(usize),
     Fast(i32),
-    Charged(i32),
+    Charged((bool, i32)),
+    Wait,
 }
 
 #[derive(Debug, PartialEq)]
@@ -177,6 +163,12 @@ pub enum CombatResult {
     Draw,
     First,
     Second,
+}
+
+#[derive(Default)]
+struct Buff {
+    atk: i16,
+    def: i16,
 }
 
 #[derive(Default)]
@@ -189,12 +181,26 @@ struct Team<'a> {
     cooldown: i32,
     fainted: bool,
     shields: u8,
+    buffs: HashMap<usize, Buff>,
 }
 
 impl<'a> Team<'a> {
-    fn get_damage(&mut self, p2: &Moveset) -> DamageType {
+    fn get_atk(&self) -> u16 {
+        ((self.movesets[self.pokemon].pokemon.stats.base_attack as i16) + (self.movesets[self.pokemon].atk as i16) + self.buffs.get(&self.pokemon).map(|b| b.atk).unwrap_or(0)) as u16
+    }
+
+    fn get_def(&self) -> u16 {
+        ((self.movesets[self.pokemon].pokemon.stats.base_defense as i16) + (self.movesets[self.pokemon].def as i16) + self.buffs.get(&self.pokemon).map(|b| b.def).unwrap_or(0)) as u16
+    }
+
+    fn get_damage(&mut self, t2: &Team) -> DamageType {
+        if self.wait > 0 {
+            self.wait -= 1;
+            return DamageType::Wait;
+        }
+
         if self.cooldown <= 0 {
-            if let Some(p) = self.get_best_pokemon_against(p2) {
+            if let Some(p) = self.get_best_pokemon_against(t2) {
                 if self.pokemon != p {
                     return DamageType::Change(p);
                 }
@@ -204,44 +210,60 @@ impl<'a> Team<'a> {
             self.cooldown -= 1;
         }
 
-        let charged1_damage = _get_damage(&self.movesets[self.pokemon].charged_move1, &self.movesets[self.pokemon], p2);
-        let charged2_damage = _get_damage(&self.movesets[self.pokemon].charged_move2, &self.movesets[self.pokemon], p2);
+        let charged1_damage = self._get_damage(&self.movesets[self.pokemon].charged_move1, t2);
+        let charged2_damage = self._get_damage(&self.movesets[self.pokemon].charged_move2, t2);
         if charged1_damage > charged2_damage {
             let energy_delta = self.movesets[self.pokemon].charged_move1.energy_delta.unwrap_or_else(|| 0) as i32;
             if self.energy + energy_delta > 0 {
                 self.energy += energy_delta;
-                return DamageType::Charged(charged1_damage);
+                return DamageType::Charged((false, charged1_damage));
             }
         }
         else {
-            let energy_delta = p2.charged_move1.energy_delta.unwrap_or_else(|| 0) as i32;
+            let energy_delta = self.movesets[self.pokemon].charged_move2.energy_delta.unwrap_or_else(|| 0) as i32;
             if self.energy + energy_delta > 0 {
                 self.energy += energy_delta;
-                return DamageType::Charged(charged2_damage);
+                return DamageType::Charged((true, charged2_damage));
             }
         }
 
         self.energy += self.movesets[self.pokemon].fast_move.energy_delta.unwrap_or_else(|| 0) as i32;
         self.wait = self.movesets[self.pokemon].fast_move.duration_turns.unwrap_or_else(|| 0) as i32;
-        DamageType::Fast(_get_damage(&self.movesets[self.pokemon].fast_move, &self.movesets[self.pokemon], p2))
+        DamageType::Fast(self._get_damage(&self.movesets[self.pokemon].fast_move, t2))
     }
 
-    fn get_best_pokemon_against(&self, p2: &Moveset) -> Option<usize> {
+    fn _get_damage(&self, m: &CombatMove, def: &Team) -> i32 {
+        let mut multipliers = 1.0;
+        //stab
+        if m.r#type == self.movesets[self.pokemon].pokemon.type1 || Some(&m.r#type) == self.movesets[self.pokemon].pokemon.type2.as_ref() {
+            multipliers *= 1.2;
+        }
+        multipliers *= EFFECTIVENESS[&m.r#type].get(&def.movesets[def.pokemon].pokemon.type1).cloned().unwrap_or_else(|| 1.0);
+        if let Some(type2) = def.movesets[def.pokemon].pokemon.type2.as_ref() {
+            multipliers *= EFFECTIVENESS[&m.r#type].get(type2).cloned().unwrap_or_else(|| 1.0);
+        }
+        ((0.5 * (m.power.unwrap_or_else(|| 0.0_f32) as f64) *
+            (((self.get_atk() as f64) * self.movesets[self.pokemon].cpm) / ((def.get_def() as f64) * def.movesets[def.pokemon].cpm)) *
+            multipliers).floor() as i32) + 1
+    }
+
+    fn get_best_pokemon_against(&self, t2: &Team) -> Option<usize> {
         let mut damages: Vec<(usize, f64)> = self.movesets.iter().enumerate().map(|(index, mv)| {
             if self.hp[index] > 0 {
                 // p1
-                let fast = _get_damage(&mv.fast_move, mv, p2);
+                let fast = self._get_damage(&mv.fast_move, t2);
                 let charged1_turns = ((mv.charged_move1.energy_delta.unwrap_or_else(|| 0) * -1) / mv.fast_move.energy_delta.unwrap_or_else(|| 0)) as i32;
-                let charged1 = (fast * charged1_turns + _get_damage(&mv.charged_move1, mv, p2)) / charged1_turns;
+                let charged1 = (fast * charged1_turns + self._get_damage(&mv.charged_move1, t2)) / charged1_turns;
                 let charged2_turns = ((mv.charged_move2.energy_delta.unwrap_or_else(|| 0) * -1) / mv.fast_move.energy_delta.unwrap_or_else(|| 0)) as i32;
-                let charged2 = (fast * charged2_turns + _get_damage(&mv.charged_move1, mv, p2)) / charged2_turns;
+                let charged2 = (fast * charged2_turns + self._get_damage(&mv.charged_move1, t2)) / charged2_turns;
                 let p1_damage = max(charged1, charged2);
                 // p2
-                let fast = _get_damage(&p2.fast_move, p2, mv);
+                let p2 = &t2.movesets[t2.pokemon];
+                let fast = t2._get_damage(&p2.fast_move, self);
                 let charged1_turns = ((p2.charged_move1.energy_delta.unwrap_or_else(|| 0) * -1) / p2.fast_move.energy_delta.unwrap_or_else(|| 0)) as i32;
-                let charged1 = (fast * charged1_turns + _get_damage(&p2.charged_move1, p2, mv)) / charged1_turns;
+                let charged1 = (fast * charged1_turns + t2._get_damage(&p2.charged_move1, self)) / charged1_turns;
                 let charged2_turns = ((p2.charged_move2.energy_delta.unwrap_or_else(|| 0) * -1) / p2.fast_move.energy_delta.unwrap_or_else(|| 0)) as i32;
-                let charged2 = (fast * charged2_turns + _get_damage(&p2.charged_move1, p2, mv)) / charged2_turns;
+                let charged2 = (fast * charged2_turns + t2._get_damage(&p2.charged_move1, self)) / charged2_turns;
                 let p2_damage = max(charged1, charged2);
                 Some((index, (p1_damage as f64) / (p2_damage as f64)))
             }
@@ -284,6 +306,38 @@ impl<'a> Team<'a> {
         }
         false
     }
+
+    fn apply_buffs(&mut self, is_third_move: bool, defender: &mut Team) {
+        let buffs = if is_third_move {
+            &self.movesets[self.pokemon].charged_move2.buffs
+        }
+        else {
+            &self.movesets[self.pokemon].charged_move1.buffs
+        };
+        if let Some(ref buff) = buffs {
+            // apply only 100% chance buffs
+            if buff.buff_activation_chance == 1.0 {
+                let entry = self.buffs.entry(self.pokemon).or_insert_with(Default::default);
+                if let Some(atk) = buff.attacker_attack_stat_stage_change {
+                    debug!("Applied atk {} buff to the attacker", atk);
+                    entry.atk += atk as i16;
+                }
+                if let Some(def) = buff.attacker_defense_stat_stage_change {
+                    debug!("Applied def {} buff to the attacker", def);
+                    entry.def += def as i16;
+                }
+                let entry = defender.buffs.entry(defender.pokemon).or_insert_with(Default::default);
+                if let Some(atk) = buff.target_attack_stat_stage_change {
+                    debug!("Applied atk {} buff to the defender", atk);
+                    entry.atk += atk as i16;
+                }
+                if let Some(def) = buff.target_defense_stat_stage_change {
+                    debug!("Applied def {} buff to the defender", def);
+                    entry.def += def as i16;
+                }
+            }
+        }
+    }
 }
 
 pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) -> CombatResult {
@@ -298,35 +352,16 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
         shields: 2,
         ..Default::default()
     };
-    let mut team1_damage;
     let mut team2 = Team {
         movesets: team2,
         hp: team2.iter().map(|mv| mv.hp as i32).collect(),
         shields: 2,
         ..Default::default()
     };
-    let mut team2_damage;
     loop {
-        if team1.wait > 0 {
-            debug!("team1 waits");
-            team1.wait -= 1;
-            team1_damage = None;
-        }
-        else {
-            team1_damage = Some(team1.get_damage(&team2.movesets[team2.pokemon]));
-        }
-        if team2.wait > 0 {
-            debug!("team2 waits");
-            team2.wait -= 1;
-            team2_damage = None;
-        }
-        else {
-            team2_damage = Some(team2.get_damage(&team1.movesets[team1.pokemon]));
-        }
-
-        match (team1_damage, team2_damage) {
-            (Some(DamageType::Charged(d1)), Some(DamageType::Charged(d2))) => {
-                if team1.movesets[team1.pokemon].pokemon.stats.base_attack + (team1.movesets[team1.pokemon].atk as u16) >= team2.movesets[team2.pokemon].pokemon.stats.base_attack + (team2.movesets[team2.pokemon].atk as u16) {
+        match (team1.get_damage(&team2), team2.get_damage(&team1)) {
+            (DamageType::Charged((c1, d1)), DamageType::Charged((c2, d2))) => {
+                if team1.get_atk() >= team2.get_atk() {
                     debug!("team1 has priority and deals {} damage with a charged move", d1);
                     if team2.use_shield(d1, Some((d2, team2.hp[team2.pokemon]))) {
                         debug!("team2 denies damage with a shield");
@@ -334,6 +369,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                     else {
                         team2.hp[team2.pokemon] -= d1;
                     }
+                    team1.apply_buffs(c1, &mut team2);
                     if team2.hp[team2.pokemon] > 0 {
                         debug!("team2 survives and deals {} damage with a charged move", d2);
                         if team1.use_shield(d2, Some((d1, team1.hp[team1.pokemon]))) {
@@ -342,6 +378,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                         else {
                             team1.hp[team1.pokemon] -= d2;
                         }
+                        team2.apply_buffs(c2, &mut team1);
                     }
                 }
                 else {
@@ -352,6 +389,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                     else {
                         team1.hp[team1.pokemon] -= d2;
                     }
+                    team2.apply_buffs(c2, &mut team1);
                     if team1.hp[team1.pokemon] > 0 {
                         debug!("team1 survives and deals {} damage with a charged move", d1);
                         if team2.use_shield(d1, Some((d2, team2.hp[team2.pokemon]))) {
@@ -360,10 +398,11 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                         else {
                             team2.hp[team2.pokemon] -= d1;
                         }
+                        team1.apply_buffs(c1, &mut team2);
                     }
                 }
             },
-            (Some(DamageType::Charged(d1)), Some(DamageType::Fast(d2))) => {
+            (DamageType::Charged((c1, d1)), DamageType::Fast(d2)) => {
                 debug!("team1 deals {} damage with a charged move", d1);
                 if team2.use_shield(d1, None) {
                     debug!("team2 denies damage with a shield");
@@ -371,12 +410,13 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 else {
                     team2.hp[team2.pokemon] -= d1;
                 }
+                team1.apply_buffs(c1, &mut team2);
                 if team2.hp[team2.pokemon] > 0 {
                     debug!("team2 survives and deals {} damage with a fast move", d2);
                     team1.hp[team1.pokemon] -= d2;
                 }
             },
-            (Some(DamageType::Fast(d1)), Some(DamageType::Charged(d2))) => {
+            (DamageType::Fast(d1), DamageType::Charged((c2, d2))) => {
                 debug!("team2 deals {} damage with a charged move", d2);
                 if team1.use_shield(d2, None) {
                     debug!("team1 denies damage with a shield");
@@ -384,29 +424,31 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 else {
                     team1.hp[team1.pokemon] -= d2;
                 }
+                team2.apply_buffs(c2, &mut team1);
                 if team1.hp[team1.pokemon] > 0 {
                     debug!("team1 survives and deals {} damage with a fast move", d1);
                     team2.hp[team2.pokemon] -= d1;
                 }
             },
-            (Some(DamageType::Fast(d1)), Some(DamageType::Fast(d2))) => {
+            (DamageType::Fast(d1), DamageType::Fast(d2)) => {
                 debug!("team1 deals {} damage with a fast move", d1);
                 team1.hp[team1.pokemon] -= d2;
                 debug!("team2 deals {} damage with a fast move", d2);
                 team2.hp[team2.pokemon] -= d1;
             },
-            (Some(DamageType::Fast(d1)), Some(DamageType::Change(p2))) => {
+            (DamageType::Fast(d1), DamageType::Change(p2)) => {
                 debug!("team1 deals {} damage with a fast move", d1);
                 team2.hp[team2.pokemon] -= d1;
                 debug!("team2 switch to {}", team2.movesets[p2].pokemon.unique_id);
                 team2.pokemon = p2;
                 team2.cooldown = 120;
             },
-            (Some(DamageType::Fast(d1)), None) => {
+            (DamageType::Fast(d1), DamageType::Wait) => {
                 debug!("team1 deals {} damage with a fast move", d1);
                 team2.hp[team2.pokemon] -= d1;
+                debug!("team2 waits");
             },
-            (Some(DamageType::Charged(d1)), Some(DamageType::Change(p2))) => {
+            (DamageType::Charged((c1, d1)), DamageType::Change(p2)) => {
                 debug!("team1 deals {} damage with a charged move", d1);
                 if team2.use_shield(d1, None) {
                     debug!("team2 denies damage with a shield");
@@ -414,11 +456,12 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 else {
                     team2.hp[team2.pokemon] -= d1;
                 }
+                team1.apply_buffs(c1, &mut team2);
                 debug!("team2 switch to {}", team2.movesets[p2].pokemon.unique_id);
                 team2.pokemon = p2;
                 team2.cooldown = 120;
             },
-            (Some(DamageType::Charged(d1)), None) => {
+            (DamageType::Charged((c1, d1)), DamageType::Wait) => {
                 debug!("team1 deals {} damage with a charged move", d1);
                 if team2.use_shield(d1, None) {
                     debug!("team2 denies damage with a shield");
@@ -426,23 +469,27 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 else {
                     team2.hp[team2.pokemon] -= d1;
                 }
+                team1.apply_buffs(c1, &mut team2);
+                debug!("team2 waits");
             },
-            (Some(DamageType::Change(p1)), None) => {
+            (DamageType::Change(p1), DamageType::Wait) => {
                 debug!("team1 switch to {}", team1.movesets[p1].pokemon.unique_id);
                 team1.pokemon = p1;
+                debug!("team2 waits");
             },
-            (Some(DamageType::Change(p1)), Some(DamageType::Fast(d2))) => {
+            (DamageType::Change(p1), DamageType::Fast(d2)) => {
                 debug!("team2 deals {} damage with a fast move", d2);
                 team1.hp[team1.pokemon] -= d2;
                 debug!("team1 switch to {}", team1.movesets[p1].pokemon.unique_id);
                 team1.pokemon = p1;
                 team2.cooldown = 120;
             },
-            (None, Some(DamageType::Fast(d2))) => {
+            (DamageType::Wait, DamageType::Fast(d2)) => {
+                debug!("team1 waits");
                 debug!("team2 deals {} damage with a fast move", d2);
                 team1.hp[team1.pokemon] -= d2;
             },
-            (Some(DamageType::Change(p1)), Some(DamageType::Charged(d2))) => {
+            (DamageType::Change(p1), DamageType::Charged((c2, d2))) => {
                 debug!("team2 deals {} damage with a charged move", d2);
                 if team1.use_shield(d2, None) {
                     debug!("team1 denies damage with a shield");
@@ -450,11 +497,13 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 else {
                     team1.hp[team1.pokemon] -= d2;
                 }
+                team2.apply_buffs(c2, &mut team1);
                 debug!("team1 switch to {}", team1.movesets[p1].pokemon.unique_id);
                 team1.pokemon = p1;
                 team1.cooldown = 120;
             },
-            (None, Some(DamageType::Charged(d2))) => {
+            (DamageType::Wait, DamageType::Charged((c2, d2))) => {
+                debug!("team1 waits");
                 debug!("team2 deals {} damage with a charged move", d2);
                 if team1.use_shield(d2, None) {
                     debug!("team1 denies damage with a shield");
@@ -462,13 +511,15 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 else {
                     team1.hp[team1.pokemon] -= d2;
                 }
+                team2.apply_buffs(c2, &mut team1);
             },
-            (None, Some(DamageType::Change(p2))) => {
+            (DamageType::Wait, DamageType::Change(p2)) => {
+                debug!("team1 waits");
                 debug!("team2 switch to {}", team2.movesets[p2].pokemon.unique_id);
                 team2.pokemon = p2;
                 team2.cooldown = 120;
             },
-            (Some(DamageType::Change(p1)), Some(DamageType::Change(p2))) => {
+            (DamageType::Change(p1), DamageType::Change(p2)) => {
                 debug!("team1 switch to {}", team1.movesets[p1].pokemon.unique_id);
                 team1.pokemon = p1;
                 team1.cooldown = 120;
@@ -476,12 +527,15 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
                 team2.pokemon = p2;
                 team2.cooldown = 120;
             },
-            (None, None) => {},
+            (DamageType::Wait, DamageType::Wait) => {
+                debug!("team1 waits");
+                debug!("team2 waits");
+            },
         }
 
         if team1.hp[team1.pokemon] <= 0 {
             debug!("team1 pokemon faints");
-            if let Some(p) = team1.get_best_pokemon_against(&team2.movesets[team2.pokemon]) {
+            if let Some(p) = team1.get_best_pokemon_against(&team2) {
                 debug!("team1 switch to {}", team1.movesets[p].pokemon.unique_id);
                 team1.pokemon = p;
                 team1.energy = 0;
@@ -497,7 +551,7 @@ pub fn combat<'a>(team1: &'a [&'a Moveset<'a>], team2: &'a [&'a Moveset<'a>]) ->
             // here team2 has the advantage to coose the best pokemon against the new pokemon in case both fainted at the same time
             // in reality would be a random choice, because you can't know which pokemon the other player will choose
             // so it's kind of ok
-            if let Some(p) = team2.get_best_pokemon_against(&team1.movesets[team1.pokemon]) {
+            if let Some(p) = team2.get_best_pokemon_against(&team1) {
                 debug!("team2 switch to {}", team2.movesets[p].pokemon.unique_id);
                 team2.pokemon = p;
                 team2.energy = 0;
@@ -1440,7 +1494,7 @@ mod test {
             charged_legacy2: None,
         };
         let start = Local::now();
-        assert_eq!(combat(&[&m0, &m1, &m2], &[&m3, &m4, &m5]), CombatResult::First);
+        assert_eq!(combat(&[&m0, &m1, &m2], &[&m3, &m4, &m5]), CombatResult::Second);
         let end = Local::now();
         info!("took {} nanoseconds", end.timestamp_nanos() - start.timestamp_nanos());
     }
