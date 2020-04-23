@@ -5,7 +5,7 @@ use tokio::{fs::File, io::AsyncReadExt};
 
 use serde::Deserialize;
 
-use log::error;
+use log::{error, info};
 
 use crate::moveset::Moveset;
 
@@ -35,6 +35,7 @@ pub async fn import<'a>(filename: &PathBuf, movesets: &'a HashMap<usize, Moveset
                     (i.charged.is_none() || i.charged.as_ref().map(|cms| cms.contains(&mv.charged_move1.unique_id) && cms.contains(&mv.charged_move2.unique_id)) == Some(true))
             });
             if let Some(p) = found {
+                info!("Found {} {} {} {}", mv.pokemon.form.as_ref().unwrap_or(&mv.pokemon.unique_id), mv.fast_move.unique_id, mv.charged_move1.unique_id, mv.charged_move2.unique_id);
                 let mut moveset = mv.clone();
                 if let Some(l) = p.level {
                     moveset.level = l;

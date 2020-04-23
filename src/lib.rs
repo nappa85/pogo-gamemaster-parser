@@ -141,15 +141,16 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
     let movesets: HashMap<usize, Moveset> = pokemon.into_iter()
         // try to cleanup duplication given by forms
         .map(|(_, forms)| {
-            let base_form = forms.get(&None);
-            let base_stats = base_form.map(|p| p.stats);
-            let base_type = base_form.map(|p| (p.type1.clone(), p.type2.clone()));
+            let base_form = forms.get(&None).map(|bf| (bf.type1.clone(), bf.type2.clone(), bf.stats.clone()));
 
             forms.into_iter()
                 .filter(move |(_, p)| {
-                    p.form.is_none() ||
-                    Some((&p.type1, p.type2.as_ref())) != base_type.as_ref().map(|(t1, t2)| (t1, t2.as_ref())) ||
-                    Some(&p.stats) != base_stats.as_ref()
+                    if p.form.is_some() {
+                        if let Some((bf_type1, bf_type2, bf_stats)) = base_form.as_ref() {
+                            return &p.type1 != bf_type1 || &p.type2 != bf_type2 || &p.stats != bf_stats;
+                        }
+                    }
+                    true
                 })
                 .map(|(_, p)| p)
         })
