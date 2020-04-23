@@ -2,10 +2,14 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::ops::RangeInclusive;
 use std::collections::HashMap;
+use std::cell::UnsafeCell;
+use std::mem::zeroed;
 
 use rayon::{iter::{ParallelBridge, ParallelIterator}, slice::ParallelSliceMut};
 
 use itertools::Itertools;
+
+use once_cell::sync::Lazy;
 
 use log::error;
 
@@ -16,10 +20,37 @@ mod entities;
 mod moveset;
 mod combat;
 
-use entities::{Root, PokemonSettings, CombatMove};
+use entities::{Root, PokemonSettings, CombatMove, PlayerLevel, CombatStatStageSettings};
 use moveset::Moveset;
 use combat::{combat, CombatResult};
 use import::import;
+
+pub struct Wrapper<T>(UnsafeCell<T>);
+
+impl<T> Wrapper<T> {
+    fn new() -> Self {
+        unsafe {
+            Wrapper(UnsafeCell::new(zeroed()))
+        }
+    }
+
+    fn get_mut(&self) -> &mut T {
+        unsafe {
+            &mut *self.0.get()
+        }
+    }
+
+    fn get(&self) -> &T {
+        unsafe {
+            &*self.0.get()
+        }
+    }
+}
+
+unsafe impl<T> Sync for Wrapper<T> {}
+
+pub static PLAYER_LEVEL: Lazy<Wrapper<PlayerLevel>> = Lazy::new(Wrapper::new);
+pub static COMBAT_STAT_STAGE_SETTINGS: Lazy<Wrapper<CombatStatStageSettings>> = Lazy::new(Wrapper::new);
 
 #[derive(Debug, StructOpt)]
 pub enum League {
@@ -52,6 +83,18 @@ impl League {
     }
 }
 
+// for testing purposes
+fn set_player_level(value: Option<PlayerLevel>) {
+    let lock = PLAYER_LEVEL.get_mut();
+    *lock = value.unwrap();
+}
+
+// for testing purposes
+fn set_combat_stat_stage_settings(value: Option<CombatStatStageSettings>) {
+    let lock = COMBAT_STAT_STAGE_SETTINGS.get_mut();
+    *lock = value.unwrap();
+}
+
 pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathBuf>) -> Result<(), ()> {
     println!("Loading game master...");
 
@@ -64,16 +107,14 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
         .map_err(|e| error!("Game Master decode error: {}", e))?;
 
     // load CPM
-    let player_level = root.item_template.iter()
+    set_player_level(root.item_template.iter()
         .find(|item| item.player_level.is_some())
-        .map(|item| item.player_level.as_ref().unwrap())
-        .unwrap();
+        .map(|item| item.player_level.clone().unwrap()));
 
     //load Buffs multipliers
-    let combat_stat_stage_settings = root.item_template.iter()
+    set_combat_stat_stage_settings(root.item_template.iter()
         .find(|item| item.combat_stat_stage_settings.is_some())
-        .map(|item| item.combat_stat_stage_settings.as_ref().unwrap())
-        .unwrap();
+        .map(|item| item.combat_stat_stage_settings.clone().unwrap()));
 
     // create PVP moves dictionary
     let combat_moves: HashMap<&str, &CombatMove> = root.item_template.iter()
@@ -113,7 +154,7 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
                 .map(|(_, p)| p)
         })
         .flatten()
-        .map(|p| Moveset::from(p, &combat_moves, Some(league.to_range()), &player_level))
+        .map(|p| Moveset::from(p, &combat_moves, Some(league.to_range())))
         .flatten()
         .enumerate()
         .collect();
@@ -124,7 +165,7 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
         import(filename, &movesets).await?
     }
     else {
-        movesets.iter().map(|(i, mv)| (*i, mv)).collect()
+        movesets.clone()
     };
     println!("Team1 is made of {} Pokémon-Moveset combinations", filter1.len());
     // let teams1 = movesets.iter()
@@ -160,7 +201,7 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
         import(filename, &movesets).await?
     }
     else {
-        movesets.iter().map(|(i, mv)| (*i, mv)).collect()
+        movesets.clone()
     };
     println!("Team2 is made of {} Pokémon-Moveset combinations", filter2.len());
     let teams2 = filter2.iter().par_bridge()
@@ -176,7 +217,7 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
     let matches = teams1.map_with(teams2, |ts, t1| ts.clone().map(move |t2| (t1, t2)))
         .flatten()
         .fold(HashMap::new, |mut dict, ((t0_0, t0_1, t0_2), (t1_0, t1_1, t1_2))| {
-            let entry = match combat(&[t0_0.1, t0_1.1, t0_2.1], &[t1_0.1, t1_1.1, t1_2.1], &combat_stat_stage_settings) {
+            let entry = match combat(&[t0_0.1, t0_1.1, t0_2.1], &[t1_0.1, t1_1.1, t1_2.1]) {
                 CombatResult::First => dict.entry(*t0_0.0).or_insert_with(HashMap::new).entry(*t0_1.0).or_insert_with(HashMap::new).entry(*t0_2.0).or_insert_with(|| 0),
                 // CombatResult::Second => dict.entry(*t1_0.0).or_insert_with(HashMap::new).entry(*t1_1.0).or_insert_with(HashMap::new).entry(*t1_2.0).or_insert_with(|| 0),
                 _ => return dict,

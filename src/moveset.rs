@@ -5,7 +5,8 @@ use itertools::Itertools;
 
 use once_cell::sync::Lazy;
 
-use crate::entities::{PokemonSettings, CombatMove, Stats, PlayerLevel};
+use crate::PLAYER_LEVEL;
+use crate::entities::{PokemonSettings, CombatMove, Stats};
 
 static LEGACY_QUICK_MOVES: Lazy<HashMap<String, Vec<&'static str>>> = Lazy::new(|| {
     let mut res = HashMap::new();
@@ -198,13 +199,13 @@ static LEGACY_CHARGED_MOVES: Lazy<HashMap<String, Vec<&'static str>>> = Lazy::ne
 #[derive(Debug, Clone)]
 pub struct Moveset<'a> {
     pub pokemon: &'a PokemonSettings,
-    pub cp: u32,
-    pub hp: u32,
+    // pub cp: u32,
+    // pub hp: u32,
     pub level: u8,
     pub atk: u8,
     pub def: u8,
     pub sta: u8,
-    pub cpm: f64,
+    // pub cpm: f64,
     pub fast_move: &'a CombatMove,
     pub fast_legacy: Option<bool>,
     pub charged_move1: &'a CombatMove,
@@ -213,23 +214,23 @@ pub struct Moveset<'a> {
     pub charged_legacy2: Option<bool>,
 }
 
-impl<'a> Moveset<'a>{
-    pub fn from(p: &'a PokemonSettings, combat_moves: &'a HashMap<&'a str, &'a CombatMove>, max_cp: Option<RangeInclusive<u32>>, player_level: &PlayerLevel) -> Vec<Self> {
+impl<'a> Moveset<'a> {
+    pub fn from(p: &'a PokemonSettings, combat_moves: &'a HashMap<&'a str, &'a CombatMove>, max_cp: Option<RangeInclusive<u32>>) -> Vec<Self> {
         let mut res = Vec::new();
         match (Self::convert_moves(&p.quick_moves, LEGACY_QUICK_MOVES.get(&p.unique_id), combat_moves), Self::convert_moves(&p.cinematic_moves, LEGACY_CHARGED_MOVES.get(&p.unique_id), combat_moves)) {
             (Some(fast), Some(charged)) => {
-                if let Some((cp, level, atk, def, sta)) = Self::get_max_level(&p.stats, p.pokemon_class.is_some(), max_cp, player_level) {
+                if let Some((_cp, level, atk, def, sta)) = Self::get_max_level(&p.stats, p.pokemon_class.is_some(), max_cp) {
                     for charged_moves in charged.into_iter().combinations(2) {
                         for fast_move in &fast {
                             res.push(Moveset {
                                 pokemon: p,
-                                cp: cp,
-                                hp: (((p.stats.base_stamina as f64) + (sta as f64)) * player_level.cp_multiplier[(level - 1) as usize]).floor() as u32,
+                                // cp: cp,
+                                // hp: (((p.stats.base_stamina as f64) + (sta as f64)) * player_level.cp_multiplier[(level - 1) as usize]).floor() as u32,
                                 level: level,
                                 atk: atk,
                                 def: def,
                                 sta: sta,
-                                cpm: player_level.cp_multiplier[(level - 1) as usize],
+                                // cpm: player_level.cp_multiplier[(level - 1) as usize],
                                 fast_move,
                                 fast_legacy: p.quick_moves.as_ref().map(|moves| !moves.contains(&fast_move.unique_id)),
                                 charged_move1: charged_moves[0],
@@ -273,13 +274,13 @@ impl<'a> Moveset<'a>{
     }
 
     // return maximum pokemon level for every IV combination to fit various CP caps
-    fn get_max_level(stats: &Stats, level15: bool, max_cp: Option<RangeInclusive<u32>>, player_level: &PlayerLevel) -> Option<(u32, u8, u8, u8, u8)> {
+    fn get_max_level(stats: &Stats, level15: bool, max_cp: Option<RangeInclusive<u32>>) -> Option<(u32, u8, u8, u8, u8)> {
         let mut res = Vec::new();
         for level in ((if level15 { 15_u8 } else { 1_u8 })..=41_u8).rev() {
             for sta in (0_u8..=15_u8).rev() {
                 for def in (0_u8..=15_u8).rev() {
                     for atk in (0_u8..=15_u8).rev() {
-                        let cp = Self::get_cp(stats, level, atk, def, sta, player_level);
+                        let cp = Self::get_cp(stats, level, atk, def, sta);
                         if let Some(ref mcp) = max_cp {
                             if !mcp.contains(&cp) {
                                 continue;
@@ -296,7 +297,18 @@ impl<'a> Moveset<'a>{
         res.pop()
     }
 
-    fn get_cp(stats: &Stats, level: u8, atk: u8, def: u8, sta: u8, player_level: &PlayerLevel) -> u32 {
+    fn get_cp(stats: &Stats, level: u8, atk: u8, def: u8, sta: u8) -> u32 {
+        let player_level = PLAYER_LEVEL.get();
         ((((stats.base_attack + (atk as u16)) as f64) * ((stats.base_defense + (def as u16)) as f64).powf(0.5) * ((stats.base_stamina + (sta as u16)) as f64).powf(0.5) * player_level.cp_multiplier[(level - 1) as usize].powi(2)) / 10_f64).floor() as u32
+    }
+
+    pub fn get_cpm(&self) -> f64 {
+        let player_level = PLAYER_LEVEL.get();
+        player_level.cp_multiplier[(self.level - 1) as usize]
+    }
+
+    pub fn get_hp(&self) -> u32 {
+        let player_level = PLAYER_LEVEL.get();
+        (((self.pokemon.stats.base_stamina as f64) + (self.sta as f64)) * player_level.cp_multiplier[(self.level - 1) as usize]).floor() as u32
     }
 }

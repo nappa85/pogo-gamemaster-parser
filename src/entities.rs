@@ -55,7 +55,7 @@ pub struct Buffs {
     pub buff_activation_chance: f32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct PlayerLevel {
     #[serde(rename = "rankNum")]
@@ -264,7 +264,7 @@ pub struct Shadow {
     pub shadow_charge_move: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct CombatStatStageSettings {
     #[serde(rename = "minimumStatStage")]
