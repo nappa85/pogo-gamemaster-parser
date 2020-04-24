@@ -135,7 +135,7 @@ As you can seen, every pokemon is level 40 (because we are in master league), ex
 
 ## Output
 
-The output is a raw list of teamw, sorted descendent by the number of won matches.<br/>
+The output is a raw list of teams, sorted descendently by the number of won matches.<br/>
 This means that the team on the bottom is the best one for this simulation.<br/>
 For example:
 ```
@@ -430,4 +430,4 @@ For example:
  MEWTWO PSYCHO_CUT_FAST FLAMETHROWER PSYSTRIKE
 }
 ```
-Beaware that the output can be really long.
+Beware that the output can be really long.
