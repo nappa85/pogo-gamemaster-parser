@@ -1,0 +1,21 @@
+name: Rust
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-linux:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --release
+    - name: Release
+      uses: yakuhzi/action-release@v1.2.0
+      with:
+        file: target/release/pogo-gamemaster-parser
