@@ -9,7 +9,7 @@ Despite having the best possible performances, I had 3 different elements to mai
 * Site Backend
 * Site Frontend
 
-This is a lot of work for a project that simple, not made for a big audience.<br />
-So I throw away everything except the frontend (you can still find the Rust Parser in the `rust` branch), and made everything work from client's browser.<br />
-Performances are bad, as in every modern web application, but the use case never implied good performances.<br />
-Maybe, one day, I'll redo everyting with WASM for good performances.
+This is a lot of work for a project that simple, not made for a big audience.<br/>
+So I tried to throw away everything except the frontend (you can still find the project in the `html` branch), and made everything work from client's browser.
+Performances were really bad, as in every modern web application, but worst.<br/>
+Maybe, one day, I'll redo everyting with WASM for good performances, but not today.
