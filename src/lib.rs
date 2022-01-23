@@ -2,14 +2,12 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::ops::RangeInclusive;
 use std::collections::HashMap;
-use std::cell::UnsafeCell;
-use std::mem::zeroed;
 
 use rayon::{iter::{ParallelBridge, ParallelIterator}, slice::ParallelSliceMut};
 
 use itertools::Itertools;
 
-use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
 
 use pogo_gamemaster_entities::{Root, PokemonSettings, CombatMove, PlayerLevel, CombatStatStageSettings};
 
@@ -25,32 +23,8 @@ use moveset::Moveset;
 use combat::{combat, CombatResult};
 use import::import;
 
-pub struct Wrapper<T>(UnsafeCell<T>);
-
-impl<T> Wrapper<T> {
-    fn new() -> Self {
-        unsafe {
-            Wrapper(UnsafeCell::new(zeroed()))
-        }
-    }
-
-    fn get_mut(&self) -> &mut T {
-        unsafe {
-            &mut *self.0.get()
-        }
-    }
-
-    fn get(&self) -> &T {
-        unsafe {
-            &*self.0.get()
-        }
-    }
-}
-
-unsafe impl<T> Sync for Wrapper<T> {}
-
-pub static PLAYER_LEVEL: Lazy<Wrapper<PlayerLevel>> = Lazy::new(Wrapper::new);
-pub static COMBAT_STAT_STAGE_SETTINGS: Lazy<Wrapper<CombatStatStageSettings>> = Lazy::new(Wrapper::new);
+pub static PLAYER_LEVEL: OnceCell<PlayerLevel> = OnceCell::new();
+pub static COMBAT_STAT_STAGE_SETTINGS: OnceCell<CombatStatStageSettings> = OnceCell::new();
 
 #[derive(Debug, StructOpt)]
 pub enum League {
@@ -84,15 +58,13 @@ impl League {
 }
 
 // for testing purposes
-fn set_player_level(value: Option<PlayerLevel>) {
-    let lock = PLAYER_LEVEL.get_mut();
-    *lock = value.unwrap();
+fn set_player_level(value: PlayerLevel) {
+    PLAYER_LEVEL.get_or_init(move || value);
 }
 
 // for testing purposes
-fn set_combat_stat_stage_settings(value: Option<CombatStatStageSettings>) {
-    let lock = COMBAT_STAT_STAGE_SETTINGS.get_mut();
-    *lock = value.unwrap();
+fn set_combat_stat_stage_settings(value: CombatStatStageSettings) {
+    COMBAT_STAT_STAGE_SETTINGS.get_or_init(move || value);
 }
 
 pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathBuf>) -> Result<(), ()> {
@@ -108,13 +80,15 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
 
     // load CPM
     set_player_level(root.template.iter()
-        .find(|item| item.data.player_level.is_some())
-        .map(|item| item.data.player_level.clone().unwrap()));
+        .filter_map(|item| item.data.player_level.clone())
+        .next()
+        .unwrap());
 
     //load Buffs multipliers
     set_combat_stat_stage_settings(root.template.iter()
-        .find(|item| item.data.combat_stat_stage_settings.is_some())
-        .map(|item| item.data.combat_stat_stage_settings.clone().unwrap()));
+        .filter_map(|item| item.data.combat_stat_stage_settings.clone())
+        .next()
+        .unwrap());
 
     // create PVP moves dictionary
     let combat_moves: HashMap<&str, &CombatMove> = root.template.iter()

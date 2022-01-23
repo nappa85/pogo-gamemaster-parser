@@ -188,13 +188,13 @@ struct Team<'a> {
 
 impl<'a> Team<'a> {
     fn get_atk(&self) -> f64 {
-        let combat_stat_stage_settings = COMBAT_STAT_STAGE_SETTINGS.get();
+        let combat_stat_stage_settings = COMBAT_STAT_STAGE_SETTINGS.get().unwrap();
         let multiplier = combat_stat_stage_settings.attack_buff_multiplier[(5_i8 + self.buffs.get(&self.pokemon).map(|b| b.atk).unwrap_or(0)) as usize];
         ((self.movesets[self.pokemon].pokemon.stats.base_attack + (self.movesets[self.pokemon].atk as u16)) as f64) * multiplier
     }
 
     fn get_def(&self) -> f64 {
-        let combat_stat_stage_settings = COMBAT_STAT_STAGE_SETTINGS.get();
+        let combat_stat_stage_settings = COMBAT_STAT_STAGE_SETTINGS.get().unwrap();
         let multiplier = combat_stat_stage_settings.defense_buff_multiplier[(5_i8 + self.buffs.get(&self.pokemon).map(|b| b.def).unwrap_or(0)) as usize];
         ((self.movesets[self.pokemon].pokemon.stats.base_defense + (self.movesets[self.pokemon].def as u16)) as f64) * multiplier
     }
@@ -326,26 +326,26 @@ impl<'a> Team<'a> {
             if buff.buff_activation_chance == 1.0 {
                 let entry = self.buffs.entry(self.pokemon).or_insert_with(Default::default);
                 if let Some(atk) = buff.attacker_attack_stat_stage_change {
-                    let combat_stat_stage_settings = COMBAT_STAT_STAGE_SETTINGS.get();
+                    let combat_stat_stage_settings = COMBAT_STAT_STAGE_SETTINGS.get().unwrap();
                     let val = min(max(entry.atk + atk, combat_stat_stage_settings.minimum_stat_stage), combat_stat_stage_settings.maximum_stat_stage);
                     debug!("Applied atk {} buff to the attacker, now is {}", atk, val);
                     entry.atk = val;
                 }
                 if let Some(def) = buff.attacker_defense_stat_stage_change {
-                    let combat_stat_stage_settings = COMBAT_STAT_STAGE_SETTINGS.get();
+                    let combat_stat_stage_settings = COMBAT_STAT_STAGE_SETTINGS.get().unwrap();
                     let val = min(max(entry.def + def, combat_stat_stage_settings.minimum_stat_stage), combat_stat_stage_settings.maximum_stat_stage);
                     debug!("Applied def {} buff to the attacker, now is {}", def, val);
                     entry.atk = val;
                 }
                 let entry = defender.buffs.entry(defender.pokemon).or_insert_with(Default::default);
                 if let Some(atk) = buff.target_attack_stat_stage_change {
-                    let combat_stat_stage_settings = COMBAT_STAT_STAGE_SETTINGS.get();
+                    let combat_stat_stage_settings = COMBAT_STAT_STAGE_SETTINGS.get().unwrap();
                     let val = min(max(entry.atk + atk, combat_stat_stage_settings.minimum_stat_stage), combat_stat_stage_settings.maximum_stat_stage);
                     debug!("Applied atk {} buff to the defender, now is {}", atk, val);
                     entry.atk = val;
                 }
                 if let Some(def) = buff.target_defense_stat_stage_change {
-                    let combat_stat_stage_settings = COMBAT_STAT_STAGE_SETTINGS.get();
+                    let combat_stat_stage_settings = COMBAT_STAT_STAGE_SETTINGS.get().unwrap();
                     let val = min(max(entry.def + def, combat_stat_stage_settings.minimum_stat_stage), combat_stat_stage_settings.maximum_stat_stage);
                     debug!("Applied def {} buff to the defender, now is {}", def, val);
                     entry.atk = val;
@@ -611,13 +611,13 @@ mod test {
         "maxEggPlayerLevel": 20,
         "maxEncounterPlayerLevel": 30,
         "maxQuestEncounterPlayerLevel": 15
-    }"#).ok()));
+    }"#).unwrap()));
     static CSSS: Lazy<()> = Lazy::new(|| set_combat_stat_stage_settings(serde_json::from_str(r#"{
         "minimumStatStage": -4,
         "maximumStatStage": 4,
         "attackBuffMultiplier": [0.5, 0.5714286, 0.6666667, 0.8, 1.0, 1.25, 1.5, 1.75, 2.0],
         "defenseBuffMultiplier": [0.5, 0.5714286, 0.6666667, 0.8, 1.0, 1.25, 1.5, 1.75, 2.0]
-    }"#).ok()));
+    }"#).unwrap()));
 
     #[test]
     fn draw() {

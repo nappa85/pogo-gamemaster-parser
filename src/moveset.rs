@@ -299,17 +299,17 @@ impl<'a> Moveset<'a> {
     }
 
     fn get_cp(stats: &Stats, level: u8, atk: u8, def: u8, sta: u8) -> u32 {
-        let player_level = PLAYER_LEVEL.get();
+        let player_level = PLAYER_LEVEL.get().unwrap();
         ((((stats.base_attack + (atk as u16)) as f64) * ((stats.base_defense + (def as u16)) as f64).powf(0.5) * ((stats.base_stamina + (sta as u16)) as f64).powf(0.5) * player_level.cp_multiplier[(level - 1) as usize].powi(2)) / 10_f64).floor() as u32
     }
 
     pub fn get_cpm(&self) -> f64 {
-        let player_level = PLAYER_LEVEL.get();
+        let player_level = PLAYER_LEVEL.get().unwrap();
         player_level.cp_multiplier[(self.level - 1) as usize]
     }
 
     pub fn get_hp(&self) -> u32 {
-        let player_level = PLAYER_LEVEL.get();
+        let player_level = PLAYER_LEVEL.get().unwrap();
         (((self.pokemon.stats.base_stamina as f64) + (self.sta as f64)) * player_level.cp_multiplier[(self.level - 1) as usize]).floor() as u32
     }
 }
