@@ -596,11 +596,12 @@ mod test {
 
     use once_cell::sync::Lazy;
 
+    use pogo_gamemaster_entities::{PokemonSettings, CombatMove};
+
     use log::info;
 
     use super::{combat, CombatResult};
     use crate::{set_player_level, set_combat_stat_stage_settings};
-    use crate::entities::{PokemonSettings, CombatMove};
     use crate::moveset::Moveset;
 
     static CPM: Lazy<()> = Lazy::new(|| set_player_level(serde_json::from_str(r#"{
