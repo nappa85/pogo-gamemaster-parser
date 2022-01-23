@@ -5,8 +5,9 @@ use itertools::Itertools;
 
 use once_cell::sync::Lazy;
 
+use pogo_gamemaster_entities::{PokemonSettings, CombatMove, Stats};
+
 use crate::PLAYER_LEVEL;
-use crate::entities::{PokemonSettings, CombatMove, Stats};
 
 static LEGACY_QUICK_MOVES: Lazy<HashMap<String, Vec<&'static str>>> = Lazy::new(|| {
     let mut res = HashMap::new();

@@ -11,16 +11,16 @@ use itertools::Itertools;
 
 use once_cell::sync::Lazy;
 
+use pogo_gamemaster_entities::{Root, PokemonSettings, CombatMove, PlayerLevel, CombatStatStageSettings};
+
 use log::error;
 
 use structopt::StructOpt;
 
 mod import;
-mod entities;
 mod moveset;
 mod combat;
 
-use entities::{Root, PokemonSettings, CombatMove, PlayerLevel, CombatStatStageSettings};
 use moveset::Moveset;
 use combat::{combat, CombatResult};
 use import::import;
@@ -99,7 +99,7 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
     println!("Loading game master...");
 
     // load game master
-    let root: Root = reqwest::get("https://raw.githubusercontent.com/pokemongo-dev-contrib/pokemongo-game-master/master/versions/latest/GAME_MASTER.json")
+    let root: Root = reqwest::get("https://raw.githubusercontent.com/pokemongo-dev-contrib/pokemongo-game-master/master/versions/latest/V2_GAME_MASTER.json")
         .await
         .map_err(|e| error!("Game Master retrieve error: {}", e))?
         .json()
@@ -107,29 +107,29 @@ pub async fn exec(league: &League, team1: Option<&PathBuf>, team2: Option<&PathB
         .map_err(|e| error!("Game Master decode error: {}", e))?;
 
     // load CPM
-    set_player_level(root.item_template.iter()
-        .find(|item| item.player_level.is_some())
-        .map(|item| item.player_level.clone().unwrap()));
+    set_player_level(root.template.iter()
+        .find(|item| item.data.player_level.is_some())
+        .map(|item| item.data.player_level.clone().unwrap()));
 
     //load Buffs multipliers
-    set_combat_stat_stage_settings(root.item_template.iter()
-        .find(|item| item.combat_stat_stage_settings.is_some())
-        .map(|item| item.combat_stat_stage_settings.clone().unwrap()));
+    set_combat_stat_stage_settings(root.template.iter()
+        .find(|item| item.data.combat_stat_stage_settings.is_some())
+        .map(|item| item.data.combat_stat_stage_settings.clone().unwrap()));
 
     // create PVP moves dictionary
-    let combat_moves: HashMap<&str, &CombatMove> = root.item_template.iter()
-        .filter(|item| item.combat_move.is_some())
+    let combat_moves: HashMap<&str, &CombatMove> = root.template.iter()
+        .filter(|item| item.data.combat_move.is_some())
         .map(|item| {
-            let combat_move = item.combat_move.as_ref().unwrap();
+            let combat_move = item.data.combat_move.as_ref().unwrap();
             (combat_move.unique_id.as_str(), combat_move)
         })
         .collect();
 
     // create Pokémon-Form dictionary
-    let pokemon: HashMap<&str, HashMap<Option<&str>, &PokemonSettings>> = root.item_template.iter()
-        .filter(|item| item.pokemon.is_some())
+    let pokemon: HashMap<&str, HashMap<Option<&str>, &PokemonSettings>> = root.template.iter()
+        .filter(|item| item.data.pokemon.is_some())
         .fold(HashMap::new(), |mut dict, item| {
-            let pokemon = item.pokemon.as_ref().unwrap();
+            let pokemon = item.data.pokemon.as_ref().unwrap();
             let sub_dict = dict.entry(pokemon.unique_id.as_str()).or_insert_with(HashMap::new);
             sub_dict.insert(pokemon.form.as_ref().map(|s| s.as_str()), pokemon);
             dict

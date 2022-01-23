@@ -3,10 +3,11 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 
+use pogo_gamemaster_entities::CombatMove;
+
 use log::debug;
 
 use crate::COMBAT_STAT_STAGE_SETTINGS;
-use crate::entities::CombatMove;
 use crate::moveset::Moveset;
 
 // EFFECTIVENESS[atk_type][def_type]
